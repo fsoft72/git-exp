@@ -1,4 +1,4 @@
-use notify::{Config, Event, RecommendedWatcher, RecursiveMode, Watcher};
+use notify::{Config, Event, EventKind, RecommendedWatcher, RecursiveMode, Watcher};
 use std::path::Path;
 use std::sync::mpsc::{Receiver, channel};
 use std::time::{Duration, Instant};
@@ -18,12 +18,22 @@ impl RepoWatcher {
         let mut watcher = RecommendedWatcher::new(
             move |res: notify::Result<Event>| {
                 if let Ok(ref ev) = res {
-                    // Ignora lock temporanei di git e file .git/objects per evitare loop di refresh
+                    // IMPORTANTE su Linux (inotify): ignora tutti gli eventi `Access` (open/read/close-nowrite)
+                    // altrimenti l'esecuzione di `git status` legge `.git` e innesca un loop infinito!
+                    if !matches!(
+                        ev.kind,
+                        EventKind::Create(_) | EventKind::Modify(_) | EventKind::Remove(_)
+                    ) {
+                        return;
+                    }
+
+                    // Ignora lock temporanei di git e directory di build/oggetti interni
                     let should_ignore = ev.paths.iter().all(|p| {
                         let s = p.to_string_lossy();
                         s.ends_with(".lock")
                             || s.contains("/.git/objects/")
-                            || s.contains("/target/debug/ incremental")
+                            || s.contains("/.git/logs/")
+                            || s.contains("/target/")
                     });
                     if should_ignore {
                         return;
@@ -41,22 +51,30 @@ impl RepoWatcher {
         Some(Self {
             _watcher: watcher,
             rx,
-            last_trigger: Instant::now() - Duration::from_secs(10),
+            last_trigger: Instant::now(),
             pending: false,
         })
     }
 
-    /// Ritorna `true` (con debounce di 350ms) quando ci sono cambiamenti sul filesystem da ricaricare.
-    pub fn poll_should_refresh(&mut self) -> bool {
+    /// Consuma gli eventi del filesystem e ritorna `true` solo se ci sono state modifiche reali
+    /// ed è trascorso almeno `min_interval` dall'ultimo trigger.
+    pub fn poll_should_refresh(&mut self, min_interval: Duration) -> bool {
         while let Ok(Ok(_event)) = self.rx.try_recv() {
             self.pending = true;
         }
 
-        if self.pending && self.last_trigger.elapsed() >= Duration::from_millis(350) {
+        if self.pending && self.last_trigger.elapsed() >= min_interval {
             self.pending = false;
             self.last_trigger = Instant::now();
             return true;
         }
         false
+    }
+
+    /// Svuota eventuali eventi accumulati durante l'esecuzione stessa di un comando git.
+    pub fn clear_pending(&mut self) {
+        while self.rx.try_recv().is_ok() {}
+        self.pending = false;
+        self.last_trigger = Instant::now();
     }
 }

@@ -318,22 +318,31 @@ impl AppState {
             }
         }
 
-        if let Some(ref mut w) = self.watcher {
-            if w.poll_should_refresh() && !self.is_busy && !self.is_refreshing_status {
-                self.trigger_refresh();
-            }
-        }
-
-        // Timer periodico configurabile "Refresh git status" (in secondi)
+        // Rispetta rigorosamente l'intervallo `refresh_interval_secs` configurato nei Settings
         if self.repo_path.is_some() && self.settings.refresh_interval_secs > 0 {
             let interval = std::time::Duration::from_secs(self.settings.refresh_interval_secs);
-            ctx.request_repaint_after(interval);
-            if self.last_refresh_time.elapsed() >= interval
+            let elapsed = self.last_refresh_time.elapsed();
+
+            let watcher_dirty = self
+                .watcher
+                .as_mut()
+                .map(|w| w.poll_should_refresh(interval))
+                .unwrap_or(false);
+
+            if (elapsed >= interval || watcher_dirty)
                 && !self.is_busy
                 && !self.is_refreshing_status
             {
                 self.trigger_refresh();
+            } else {
+                let remaining = interval
+                    .saturating_sub(elapsed)
+                    .max(std::time::Duration::from_millis(250));
+                ctx.request_repaint_after(remaining);
             }
+        } else if let Some(ref mut w) = self.watcher {
+            // Se refresh_interval_secs == 0 (auto-refresh disabilitato), svuota la coda del watcher
+            w.clear_pending();
         }
 
         let mut need_refresh = false;
@@ -348,6 +357,10 @@ impl AppState {
                 } => {
                     self.is_refreshing_status = false;
                     self.last_refresh_time = Instant::now();
+                    if let Some(ref mut w) = self.watcher {
+                        // Scarta eventuali eventi generati da git stesso durante il refresh
+                        w.clear_pending();
+                    }
                     if self.busy_label == "Refreshing Git status..." {
                         self.is_busy = false;
                         self.busy_label.clear();
