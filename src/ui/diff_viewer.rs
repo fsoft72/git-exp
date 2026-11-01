@@ -960,11 +960,29 @@ fn render_empty_editor_watermark(ui: &mut egui::Ui, state: &mut AppState) {
             let top_pad = (ui.available_height() * 0.20).max(16.0);
             ui.add_space(top_pad);
 
-            ui.label(
-                RichText::new("Git-Exp")
-                    .size(22.0)
-                    .strong()
-                    .color(VsCodeTheme::TEXT_BRIGHT),
+            let title_text = RichText::new("Git-Exp")
+                .size(24.0)
+                .strong()
+                .color(VsCodeTheme::TEXT_BRIGHT);
+            let galley = egui::WidgetText::from(title_text.clone())
+                .into_galley(ui, None, f32::INFINITY, egui::TextStyle::Heading);
+            let text_width = galley.size().x;
+            let icon_size = egui::vec2(28.0, 28.0);
+            let spacing = 8.0;
+            let row_width = icon_size.x + spacing + text_width;
+            let row_height = icon_size.y.max(galley.size().y);
+
+            ui.allocate_ui_with_layout(
+                egui::vec2(row_width, row_height),
+                egui::Layout::left_to_right(egui::Align::Center),
+                |ui| {
+                    ui.spacing_mut().item_spacing.x = spacing;
+                    ui.add(
+                        egui::Image::new(egui::include_image!("../../assets/images/logo.svg"))
+                            .fit_to_exact_size(icon_size),
+                    );
+                    ui.label(title_text);
+                },
             );
             ui.add_space(4.0);
             ui.label(

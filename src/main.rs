@@ -37,7 +37,8 @@ struct VsCodeGitApp {
 }
 
 impl VsCodeGitApp {
-    fn new(_cc: &eframe::CreationContext<'_>, initial_repo: Option<PathBuf>) -> Self {
+    fn new(cc: &eframe::CreationContext<'_>, initial_repo: Option<PathBuf>) -> Self {
+        egui_extras::install_image_loaders(&cc.egui_ctx);
         Self {
             state: AppState::new(initial_repo),
             theme_applied: false,

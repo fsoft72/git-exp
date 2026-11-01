@@ -1,4 +1,4 @@
-# git-exp
+# <img src="assets/images/logo.svg" width="36" height="36" valign="middle" style="vertical-align: middle;" alt="git-exp logo"> git-exp
 
 ![git-exp UI](assets/images/ui.png)
 
