@@ -1,59 +1,59 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Posizionati nella root del repository
+# Move to the repository root
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 cd "$REPO_ROOT"
 
 if [ $# -ne 1 ]; then
-    echo "Uso: $0 <nuova_versione> (es. 0.1.2)" >&2
+    echo "Usage: $0 <new_version> (e.g. 0.1.2)" >&2
     exit 1
 fi
 
 NEW_VERSION="$1"
 
-# Valida formato versione (es. 0.1.2 o 0.1.2-beta.1)
+# Validate version format (e.g. 0.1.2 or 0.1.2-beta.1)
 if [[ ! "$NEW_VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$ ]]; then
-    echo "Errore: formato versione non valido '$NEW_VERSION'. Usa SemVer (es. 0.1.2)." >&2
+    echo "Error: invalid version format '$NEW_VERSION'. Expected SemVer (e.g. 0.1.2)." >&2
     exit 1
 fi
 
-# 1. Verifica di essere sul branch master
+# 1. Ensure current branch is master
 CURRENT_BRANCH="$(git branch --show-current)"
 if [ "$CURRENT_BRANCH" != "master" ]; then
-    echo "Errore: lo script deve essere eseguito dal branch 'master' (branch attuale: '$CURRENT_BRANCH')." >&2
+    echo "Error: script must be run from 'master' branch (current branch: '$CURRENT_BRANCH')." >&2
     exit 1
 fi
 
-# 2. Verifica che il repository sia pulito (nessun file modificato, in stage o untracked)
+# 2. Ensure working tree is clean (no modified, staged, or untracked files)
 if [ -n "$(git status --porcelain)" ]; then
-    echo "Errore: il repository non è pulito. Committa o annulla le modifiche prima di procedere." >&2
+    echo "Error: working tree is not clean. Commit or discard changes before proceeding." >&2
     git status --short >&2
     exit 1
 fi
 
-echo "==> Aggiornamento versione a $NEW_VERSION..."
+echo "==> Updating version to $NEW_VERSION..."
 
-# Aggiorna Cargo.toml (solo nella sezione [package])
+# Update Cargo.toml ([package] section only)
 sed -i '/^\[package\]/,/^\[/ s/^version = ".*"/version = "'"$NEW_VERSION"'"/' Cargo.toml
 
-# Aggiorna Cargo.lock (blocco del pacchetto git-exp)
+# Update Cargo.lock (git-exp package block)
 sed -i '/^name = "git-exp"$/{n;s/^version = ".*"/version = "'"$NEW_VERSION"'"/;}' Cargo.lock
 
-# Aggiorna .github/workflows/release.yml
+# Update .github/workflows/release.yml
 if [ -f ".github/workflows/release.yml" ]; then
     sed -i 's/^\([[:space:]]*VERSION:[[:space:]]*\)"[^"]*"/\1"'"$NEW_VERSION"'"/' .github/workflows/release.yml
 fi
 
-# Commit e push su master
-echo "==> Commit e push su master..."
+# Commit and push to master
+echo "==> Committing and pushing to master..."
 git add Cargo.toml Cargo.lock .github/workflows/release.yml
 git commit -m "CHORE: bump version to $NEW_VERSION"
 git push origin master
 
-# Switch al branch publish, allinea con master e fai push
-echo "==> Switch a publish, merge di master e push..."
+# Switch to publish branch, fast-forward merge master, and push
+echo "==> Switching to publish, merging master, and pushing..."
 if git show-ref --verify --quiet refs/heads/publish; then
     git checkout publish
 else
@@ -63,9 +63,8 @@ fi
 git merge --ff-only master
 git push origin publish
 
-# Torna a master
-echo "==> Ritorno al branch master..."
+# Return to master
+echo "==> Returning to master branch..."
 git checkout master
 
-echo "==> Versione $NEW_VERSION pubblicata con successo!"
-
+echo "==> Version $NEW_VERSION published successfully!"
