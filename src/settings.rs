@@ -1,3 +1,4 @@
+use crate::i18n::Language;
 use serde::{Deserialize, Serialize};
 use std::fs;
 use std::path::PathBuf;
@@ -19,6 +20,7 @@ pub enum DiffViewMode {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(default)]
 pub struct UserSettings {
+    pub language: Language,
     pub recent_repos: Vec<String>,
     pub default_file_view_mode: ScmFileViewMode,
     pub file_view_mode: ScmFileViewMode,
@@ -36,6 +38,7 @@ pub struct UserSettings {
 impl Default for UserSettings {
     fn default() -> Self {
         Self {
+            language: Language::En,
             recent_repos: Vec::new(),
             default_file_view_mode: ScmFileViewMode::Tree,
             file_view_mode: ScmFileViewMode::Tree,

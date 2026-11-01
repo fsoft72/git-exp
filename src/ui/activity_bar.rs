@@ -1,8 +1,10 @@
+use crate::i18n::tr;
 use crate::state::{ActiveSidebarPanel, AppState, QuickPickKind, QuickPickState};
 use crate::theme::VsCodeTheme;
 use egui::{Color32, CornerRadius, FontFamily, FontId, Pos2, Rect, Sense, Stroke, Vec2};
 
 pub fn render_activity_bar(ctx: &egui::Context, state: &mut AppState) {
+    let lang = state.settings.language;
     egui::SidePanel::left("vscode_activity_bar")
         .exact_width(48.0)
         .resizable(false)
@@ -22,7 +24,11 @@ pub fn render_activity_bar(ctx: &egui::Context, state: &mut AppState) {
                     scm_active,
                     ActivityIcon::SourceControl,
                     Some(state.status.total_changes_count()),
-                    "Source Control (Ctrl+Shift+G)",
+                    tr(
+                        lang,
+                        "Source Control (Ctrl+Shift+G)",
+                        "Controllo Codice Sorgente (Ctrl+Shift+G)",
+                    ),
                 ) {
                     state.active_sidebar = ActiveSidebarPanel::SourceControl;
                 }
@@ -34,7 +40,11 @@ pub fn render_activity_bar(ctx: &egui::Context, state: &mut AppState) {
                     graph_active,
                     ActivityIcon::CommitGraph,
                     None,
-                    "Source Control Graph (Commit History)",
+                    tr(
+                        lang,
+                        "Source Control Graph (Commit History)",
+                        "Grafo Controllo Sorgente (Cronologia Commit)",
+                    ),
                 ) {
                     state.active_sidebar = ActiveSidebarPanel::GraphFull;
                 }
@@ -46,7 +56,7 @@ pub fn render_activity_bar(ctx: &egui::Context, state: &mut AppState) {
                     repo_active,
                     ActivityIcon::Repositories,
                     None,
-                    "Repositories & Workspace",
+                    tr(lang, "Repositories & Workspace", "Repository e Workspace"),
                 ) {
                     state.active_sidebar = ActiveSidebarPanel::Repositories;
                 }
@@ -61,7 +71,11 @@ pub fn render_activity_bar(ctx: &egui::Context, state: &mut AppState) {
                     state.settings.show_output_panel,
                     ActivityIcon::OutputTerminal,
                     None,
-                    "Toggle Git Output Log",
+                    tr(
+                        lang,
+                        "Toggle Git Output Log",
+                        "Mostra/Nascondi Log Output Git",
+                    ),
                 ) {
                     state.settings.show_output_panel = !state.settings.show_output_panel;
                     state.settings.save();
@@ -73,7 +87,11 @@ pub fn render_activity_bar(ctx: &egui::Context, state: &mut AppState) {
                     state.quick_pick.is_some(),
                     ActivityIcon::CommandPalette,
                     None,
-                    "Git Command Palette (Ctrl+Shift+P)",
+                    tr(
+                        lang,
+                        "Git Command Palette (Ctrl+Shift+P)",
+                        "Palette Comandi Git (Ctrl+Shift+P)",
+                    ),
                 ) {
                     state.quick_pick = Some(QuickPickState::new(QuickPickKind::CommandPalette));
                 }
@@ -85,7 +103,11 @@ pub fn render_activity_bar(ctx: &egui::Context, state: &mut AppState) {
                     settings_active,
                     ActivityIcon::SettingsGear,
                     None,
-                    "Settings & Git Refresh Configuration",
+                    tr(
+                        lang,
+                        "Settings & Git Refresh Configuration",
+                        "Impostazioni e Configurazione Git",
+                    ),
                 ) {
                     state.active_sidebar = ActiveSidebarPanel::Settings;
                 }

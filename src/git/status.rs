@@ -30,18 +30,19 @@ impl FileStatusKind {
     }
 
     /// Tooltip descrittivo stile VS Code.
-    pub fn label(self, staged: bool) -> &'static str {
+    pub fn label(self, staged: bool, lang: crate::i18n::Language) -> &'static str {
+        use crate::i18n::tr;
         match (self, staged) {
-            (Self::Modified, true) => "Index Modified",
-            (Self::Modified, false) => "Modified",
-            (Self::Added, _) => "Index Added",
-            (Self::Deleted, true) => "Index Deleted",
-            (Self::Deleted, false) => "Deleted",
-            (Self::Renamed, _) => "Index Renamed",
-            (Self::Copied, _) => "Index Copied",
-            (Self::Untracked, _) => "Untracked",
-            (Self::Conflicted, _) => "Merge Conflict",
-            (Self::TypeChanged, _) => "Type Changed",
+            (Self::Modified, true) => tr(lang, "Index Modified", "Modificato nell'Index"),
+            (Self::Modified, false) => tr(lang, "Modified", "Modificato"),
+            (Self::Added, _) => tr(lang, "Index Added", "Aggiunto nell'Index"),
+            (Self::Deleted, true) => tr(lang, "Index Deleted", "Eliminato nell'Index"),
+            (Self::Deleted, false) => tr(lang, "Deleted", "Eliminato"),
+            (Self::Renamed, _) => tr(lang, "Index Renamed", "Rinominato nell'Index"),
+            (Self::Copied, _) => tr(lang, "Index Copied", "Copiato nell'Index"),
+            (Self::Untracked, _) => tr(lang, "Untracked", "Non tracciato"),
+            (Self::Conflicted, _) => tr(lang, "Merge Conflict", "Conflitto di Merge"),
+            (Self::TypeChanged, _) => tr(lang, "Type Changed", "Tipo Modificato"),
         }
     }
 

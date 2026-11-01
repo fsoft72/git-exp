@@ -3,6 +3,7 @@ use crate::git::diff::{DiffTarget, FileDiff, fetch_file_diff, target_from_change
 use crate::git::graph::{CommitDetails, CommitNode, fetch_commit_details, fetch_commit_graph};
 use crate::git::ops::{self, CommitVariant};
 use crate::git::status::{FileChange, FileStatusKind, RepoStatus, fetch_repo_status};
+use crate::i18n::{Language, tr};
 use crate::settings::UserSettings;
 use crate::watcher::RepoWatcher;
 use std::collections::{BTreeMap, BTreeSet};
@@ -280,10 +281,17 @@ impl AppState {
         }
 
         if !candidate.join(".git").exists() {
-            self.last_error = Some(format!(
-                "La cartella '{}' non contiene un repository Git (.git non trovato).",
-                path.display()
-            ));
+            let lang = self.settings.language;
+            self.last_error = Some(match lang {
+                Language::En => format!(
+                    "Folder '{}' does not contain a Git repository (.git not found).",
+                    path.display()
+                ),
+                Language::It => format!(
+                    "La cartella '{}' non contiene un repository Git (.git non trovato).",
+                    path.display()
+                ),
+            });
             return;
         }
 
@@ -298,6 +306,7 @@ impl AppState {
     }
 
     pub fn init_repository_at(&mut self, path: PathBuf, ctx: &egui::Context) {
+        let lang = self.settings.language;
         match crate::git::cli::run_git(&path, &["init"], None, true) {
             Ok(out) if out.is_success() => {
                 self.git_logs.push(out.log);
@@ -305,7 +314,11 @@ impl AppState {
             }
             Ok(out) => {
                 self.git_logs.push(out.log);
-                self.last_error = Some(format!("Errore git init: {}", out.stderr));
+                self.last_error = Some(format!(
+                    "{}: {}",
+                    tr(lang, "git init error", "Errore git init"),
+                    out.stderr
+                ));
             }
             Err(e) => {
                 self.last_error = Some(e);
@@ -367,7 +380,9 @@ impl AppState {
                         // Scarta eventuali eventi generati da git stesso durante il refresh
                         w.clear_pending();
                     }
-                    if self.busy_label == "Refreshing Git status..." {
+                    if self.busy_label == "Refreshing Git status..."
+                        || self.busy_label == "Aggiornamento stato Git..."
+                    {
                         self.is_busy = false;
                         self.busy_label.clear();
                     }
@@ -433,7 +448,12 @@ impl AppState {
         self.last_refresh_time = Instant::now();
         if self.settings.show_refresh_status_message {
             self.is_busy = true;
-            self.busy_label = "Refreshing Git status...".to_string();
+            self.busy_label = tr(
+                self.settings.language,
+                "Refreshing Git status...",
+                "Aggiornamento stato Git...",
+            )
+            .to_string();
         }
 
         thread::spawn(move || {
@@ -564,6 +584,7 @@ impl AppState {
         let Some(ref repo) = self.repo_path else {
             return;
         };
+        let lang = self.settings.language;
         let full = repo.join(rel_path);
         match fs::read_to_string(&full) {
             Ok(content) => {
@@ -575,7 +596,10 @@ impl AppState {
                 self.upsert_and_activate_tab(tab);
             }
             Err(e) => {
-                self.last_error = Some(format!("Impossibile aprire '{}': {}", rel_path, e));
+                self.last_error = Some(match lang {
+                    Language::En => format!("Unable to open '{}': {}", rel_path, e),
+                    Language::It => format!("Impossibile aprire '{}': {}", rel_path, e),
+                });
             }
         }
     }
@@ -584,6 +608,7 @@ impl AppState {
         let Some(ref repo) = self.repo_path else {
             return;
         };
+        let lang = self.settings.language;
         if let Some(CenterTab::FileEditor {
             path,
             content,
@@ -594,12 +619,18 @@ impl AppState {
             match fs::write(&full, content.as_bytes()) {
                 Ok(_) => {
                     *dirty = false;
-                    self.toast_notification =
-                        Some((format!("Salvato {}", path), Instant::now()));
+                    let msg = match lang {
+                        Language::En => format!("Saved {}", path),
+                        Language::It => format!("Salvato {}", path),
+                    };
+                    self.toast_notification = Some((msg, Instant::now()));
                     self.trigger_refresh();
                 }
                 Err(e) => {
-                    self.last_error = Some(format!("Errore salvataggio {}: {}", path, e));
+                    self.last_error = Some(match lang {
+                        Language::En => format!("Error saving {}: {}", path, e),
+                        Language::It => format!("Errore salvataggio {}: {}", path, e),
+                    });
                 }
             }
         }
@@ -628,7 +659,12 @@ impl AppState {
     // --- Azioni Git ad alto livello invocate dalla UI ---
 
     pub fn stage_file(&mut self, path: String) {
-        self.spawn_git_task("Staging file...", move |repo| {
+        let lbl = tr(
+            self.settings.language,
+            "Staging file...",
+            "Aggiunta file allo stage...",
+        );
+        self.spawn_git_task(lbl, move |repo| {
             ops::stage_paths(repo, &[path])
                 .map(|l| (String::new(), vec![l]))
                 .map_err(|(e, l)| (e, vec![l]))
@@ -636,7 +672,12 @@ impl AppState {
     }
 
     pub fn stage_paths_batch(&mut self, paths: Vec<String>) {
-        self.spawn_git_task("Staging paths...", move |repo| {
+        let lbl = tr(
+            self.settings.language,
+            "Staging paths...",
+            "Aggiunta percorsi allo stage...",
+        );
+        self.spawn_git_task(lbl, move |repo| {
             ops::stage_paths(repo, &paths)
                 .map(|l| (String::new(), vec![l]))
                 .map_err(|(e, l)| (e, vec![l]))
@@ -644,7 +685,12 @@ impl AppState {
     }
 
     pub fn stage_all(&mut self) {
-        self.spawn_git_task("Staging all changes...", move |repo| {
+        let lbl = tr(
+            self.settings.language,
+            "Staging all changes...",
+            "Aggiunta di tutte le modifiche allo stage...",
+        );
+        self.spawn_git_task(lbl, move |repo| {
             ops::stage_all(repo)
                 .map(|l| (String::new(), vec![l]))
                 .map_err(|(e, l)| (e, vec![l]))
@@ -653,7 +699,12 @@ impl AppState {
 
     pub fn unstage_file(&mut self, path: String) {
         let has_commits = !self.status.head_oid.is_empty() && self.status.head_oid != "(initial)";
-        self.spawn_git_task("Unstaging file...", move |repo| {
+        let lbl = tr(
+            self.settings.language,
+            "Unstaging file...",
+            "Rimozione file dallo stage...",
+        );
+        self.spawn_git_task(lbl, move |repo| {
             ops::unstage_paths(repo, &[path], has_commits)
                 .map(|l| (String::new(), vec![l]))
                 .map_err(|(e, l)| (e, vec![l]))
@@ -662,7 +713,12 @@ impl AppState {
 
     pub fn unstage_paths_batch(&mut self, paths: Vec<String>) {
         let has_commits = !self.status.head_oid.is_empty() && self.status.head_oid != "(initial)";
-        self.spawn_git_task("Unstaging paths...", move |repo| {
+        let lbl = tr(
+            self.settings.language,
+            "Unstaging paths...",
+            "Rimozione percorsi dallo stage...",
+        );
+        self.spawn_git_task(lbl, move |repo| {
             ops::unstage_paths(repo, &paths, has_commits)
                 .map(|l| (String::new(), vec![l]))
                 .map_err(|(e, l)| (e, vec![l]))
@@ -671,7 +727,12 @@ impl AppState {
 
     pub fn unstage_all(&mut self) {
         let has_commits = !self.status.head_oid.is_empty() && self.status.head_oid != "(initial)";
-        self.spawn_git_task("Unstaging all changes...", move |repo| {
+        let lbl = tr(
+            self.settings.language,
+            "Unstaging all changes...",
+            "Rimozione di tutte le modifiche dallo stage...",
+        );
+        self.spawn_git_task(lbl, move |repo| {
             ops::unstage_all(repo, has_commits)
                 .map(|l| (String::new(), vec![l]))
                 .map_err(|(e, l)| (e, vec![l]))
@@ -679,17 +740,45 @@ impl AppState {
     }
 
     pub fn discard_file_confirmed(&mut self, path: String, kind: FileStatusKind) {
-        self.spawn_git_task("Discarding file changes...", move |repo| {
+        let lang = self.settings.language;
+        let lbl = tr(
+            lang,
+            "Discarding file changes...",
+            "Annullamento modifiche file...",
+        );
+        self.spawn_git_task(lbl, move |repo| {
             ops::discard_file(repo, &path, kind)
-                .map(|l| (format!("Ripristinato {}", path), vec![l]))
+                .map(|l| {
+                    let msg = match lang {
+                        Language::En => format!("Restored {}", path),
+                        Language::It => format!("Ripristinato {}", path),
+                    };
+                    (msg, vec![l])
+                })
                 .map_err(|(e, l)| (e, vec![l]))
         });
     }
 
     pub fn discard_all_confirmed(&mut self) {
-        self.spawn_git_task("Discarding all changes...", move |repo| {
+        let lang = self.settings.language;
+        let lbl = tr(
+            lang,
+            "Discarding all changes...",
+            "Annullamento di tutte le modifiche...",
+        );
+        self.spawn_git_task(lbl, move |repo| {
             ops::discard_all(repo)
-                .map(|logs| ("Tutte le modifiche non staged sono state annullate".into(), logs))
+                .map(|logs| {
+                    (
+                        tr(
+                            lang,
+                            "All unstaged changes have been discarded",
+                            "Tutte le modifiche non in stage sono state annullate",
+                        )
+                        .into(),
+                        logs,
+                    )
+                })
                 .map_err(|(e, l)| (e, vec![l]))
         });
     }
@@ -704,13 +793,20 @@ impl AppState {
     }
 
     pub fn execute_commit(&mut self, variant: CommitVariant) {
+        let lang = self.settings.language;
         let msg = self.commit_message.trim().to_string();
         let amend = self.commit_amend || variant == CommitVariant::Amend;
         let signoff = self.settings.commit_signoff || variant == CommitVariant::SignOff;
 
         if msg.is_empty() && !amend {
-            self.last_error =
-                Some("Inserisci un messaggio di commit prima di confermare.".to_string());
+            self.last_error = Some(
+                tr(
+                    lang,
+                    "Please enter a commit message before committing.",
+                    "Inserisci un messaggio di commit prima di confermare.",
+                )
+                .to_string(),
+            );
             return;
         }
 
@@ -724,7 +820,8 @@ impl AppState {
         self.commit_message.clear();
         self.commit_amend = false;
 
-        self.spawn_git_task("Committing changes...", move |repo| {
+        let lbl = tr(lang, "Committing changes...", "Commit delle modifiche...");
+        self.spawn_git_task(lbl, move |repo| {
             let mut logs = Vec::new();
             if auto_stage_all {
                 let l = ops::stage_all(repo).map_err(|(e, l)| (e, vec![l]))?;
@@ -749,7 +846,10 @@ impl AppState {
                         (e, logs.clone())
                     })?;
                     logs.push(p_log);
-                    Ok(("Commit & Push completati".to_string(), logs))
+                    Ok((
+                        tr(lang, "Commit & Push completed", "Commit & Push completati").to_string(),
+                        logs,
+                    ))
                 }
                 CommitVariant::CommitAndSync => {
                     let s_logs = ops::sync_repo(repo, has_upstream, &current_branch).map_err(
@@ -759,9 +859,15 @@ impl AppState {
                         },
                     )?;
                     logs.extend(s_logs);
-                    Ok(("Commit & Sync completati".to_string(), logs))
+                    Ok((
+                        tr(lang, "Commit & Sync completed", "Commit & Sync completati").to_string(),
+                        logs,
+                    ))
                 }
-                _ => Ok(("Commit completato".to_string(), logs)),
+                _ => Ok((
+                    tr(lang, "Commit completed", "Commit completato").to_string(),
+                    logs,
+                )),
             }
         });
     }

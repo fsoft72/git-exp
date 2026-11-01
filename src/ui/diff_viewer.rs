@@ -1,5 +1,6 @@
 use crate::git::diff::{DiffHunk, DiffLineKind, DiffTarget, FileDiff};
 use crate::git::graph::CommitDetails;
+use crate::i18n::{Language, tr};
 use crate::settings::DiffViewMode;
 use crate::state::{AppState, CenterTab, QuickPickKind, QuickPickState};
 use crate::theme::{Codicon, VsCodeTheme, codicon_button, codicon_text_button};
@@ -118,7 +119,11 @@ fn render_editor_tab_bar(ui: &mut egui::Ui, state: &mut AppState) {
                                         && codicon_button(
                                             ui,
                                             Codicon::Close,
-                                            "Close Tab (Middle-Click)",
+                                            tr(
+                                                state.settings.language,
+                                                "Close Tab (Middle-Click)",
+                                                "Chiudi Scheda (Click Centrale)",
+                                            ),
                                         )
                                     {
                                         close_clicked = true;
@@ -146,6 +151,7 @@ fn render_editor_tab_bar(ui: &mut egui::Ui, state: &mut AppState) {
 }
 
 fn render_diff_tab(ui: &mut egui::Ui, state: &mut AppState, diff: &FileDiff) {
+    let lang = state.settings.language;
     // 1. Breadcrumb & Toolbar del Diff Editor
     egui::Frame::NONE
         .fill(VsCodeTheme::EDITOR_BG)
@@ -182,17 +188,17 @@ fn render_diff_tab(ui: &mut egui::Ui, state: &mut AppState, diff: &FileDiff) {
                     if codicon_text_button(
                         ui,
                         Codicon::DiffInline,
-                        "Inline",
+                        tr(lang, "Inline", "In linea"),
                         if !is_sbs {
                             VsCodeTheme::LIST_ACTIVE_SELECTION_BG
                         } else {
                             Color32::TRANSPARENT
                         },
                         VsCodeTheme::TEXT_PRIMARY,
-                        Vec2::new(62.0, 20.0),
+                        Vec2::new(68.0, 20.0),
                         CornerRadius::same(3),
                     )
-                    .on_hover_text("Inline Diff View")
+                    .on_hover_text(tr(lang, "Inline Diff View", "Vista Diff in Linea"))
                     .clicked()
                     {
                         state.settings.diff_view_mode = DiffViewMode::Inline;
@@ -201,7 +207,7 @@ fn render_diff_tab(ui: &mut egui::Ui, state: &mut AppState, diff: &FileDiff) {
                     if codicon_text_button(
                         ui,
                         Codicon::SplitHorizontal,
-                        "Side-by-Side",
+                        tr(lang, "Side-by-Side", "Affiancata"),
                         if is_sbs {
                             VsCodeTheme::LIST_ACTIVE_SELECTION_BG
                         } else {
@@ -211,7 +217,7 @@ fn render_diff_tab(ui: &mut egui::Ui, state: &mut AppState, diff: &FileDiff) {
                         Vec2::new(98.0, 20.0),
                         CornerRadius::same(3),
                     )
-                    .on_hover_text("Side-by-Side Diff View")
+                    .on_hover_text(tr(lang, "Side-by-Side Diff View", "Vista Diff Affiancata"))
                     .clicked()
                     {
                         state.settings.diff_view_mode = DiffViewMode::SideBySide;
@@ -222,21 +228,41 @@ fn render_diff_tab(ui: &mut egui::Ui, state: &mut AppState, diff: &FileDiff) {
 
                     // Azioni sull'intero file con icone vettoriali Codicon
                     let path_str = diff.target.path().to_string();
-                    if codicon_button(ui, Codicon::OpenFile, "Open File in Editor") {
+                    if codicon_button(
+                        ui,
+                        Codicon::OpenFile,
+                        tr(lang, "Open File in Editor", "Apri File nell'Editor"),
+                    ) {
                         state.open_file_in_editor(&path_str);
                     }
                     if diff.target.can_stage()
-                        && codicon_button(ui, Codicon::Plus, "Stage Entire File")
+                        && codicon_button(
+                            ui,
+                            Codicon::Plus,
+                            tr(lang, "Stage Entire File", "Aggiungi Intero File allo Stage"),
+                        )
                     {
                         state.stage_file(path_str.clone());
                     }
                     if diff.target.can_unstage()
-                        && codicon_button(ui, Codicon::Minus, "Unstage Entire File")
+                        && codicon_button(
+                            ui,
+                            Codicon::Minus,
+                            tr(lang, "Unstage Entire File", "Rimuovi Intero File dallo Stage"),
+                        )
                     {
                         state.unstage_file(path_str.clone());
                     }
                     if diff.target.can_revert()
-                        && codicon_button(ui, Codicon::Discard, "Discard All Changes in File")
+                        && codicon_button(
+                            ui,
+                            Codicon::Discard,
+                            tr(
+                                lang,
+                                "Discard All Changes in File",
+                                "Annulla Tutte le Modifiche nel File",
+                            ),
+                        )
                     {
                         if let DiffTarget::WorkingTree { path, kind } = &diff.target {
                             state.quick_pick = Some(QuickPickState::new(
@@ -252,12 +278,24 @@ fn render_diff_tab(ui: &mut egui::Ui, state: &mut AppState, diff: &FileDiff) {
 
                     // Navigazione Hunk: Next / Previous Change
                     let hunk_cnt = diff.hunks.len();
-                    if codicon_button(ui, Codicon::ArrowDown, "Next Change (F7)") && hunk_cnt > 0 {
+                    if codicon_button(
+                        ui,
+                        Codicon::ArrowDown,
+                        tr(lang, "Next Change (F7)", "Modifica Successiva (F7)"),
+                    ) && hunk_cnt > 0
+                    {
                         state.current_hunk_cursor = (state.current_hunk_cursor + 1) % hunk_cnt;
                         state.scroll_to_hunk = Some(state.current_hunk_cursor);
                     }
-                    if codicon_button(ui, Codicon::ArrowUp, "Previous Change (Shift+F7)")
-                        && hunk_cnt > 0
+                    if codicon_button(
+                        ui,
+                        Codicon::ArrowUp,
+                        tr(
+                            lang,
+                            "Previous Change (Shift+F7)",
+                            "Modifica Precedente (Shift+F7)",
+                        ),
+                    ) && hunk_cnt > 0
                     {
                         state.current_hunk_cursor = if state.current_hunk_cursor == 0 {
                             hunk_cnt - 1
@@ -284,9 +322,13 @@ fn render_diff_tab(ui: &mut egui::Ui, state: &mut AppState, diff: &FileDiff) {
     if diff.is_binary {
         ui.centered_and_justified(|ui| {
             ui.label(
-                RichText::new("Binary file modified - cannot display text diff.")
-                    .size(13.0)
-                    .color(VsCodeTheme::TEXT_MUTED),
+                RichText::new(tr(
+                    lang,
+                    "Binary file modified - cannot display text diff.",
+                    "File binario modificato - impossibile mostrare il diff testuale.",
+                ))
+                .size(13.0)
+                .color(VsCodeTheme::TEXT_MUTED),
             );
         });
         return;
@@ -295,9 +337,13 @@ fn render_diff_tab(ui: &mut egui::Ui, state: &mut AppState, diff: &FileDiff) {
     if diff.hunks.is_empty() {
         ui.centered_and_justified(|ui| {
             ui.label(
-                RichText::new("No textual changes to display in this view.")
-                    .size(13.0)
-                    .color(VsCodeTheme::TEXT_MUTED),
+                RichText::new(tr(
+                    lang,
+                    "No textual changes to display in this view.",
+                    "Nessuna modifica testuale da visualizzare in questa vista.",
+                ))
+                .size(13.0)
+                .color(VsCodeTheme::TEXT_MUTED),
             );
         });
         return;
@@ -310,9 +356,11 @@ fn render_diff_tab(ui: &mut egui::Ui, state: &mut AppState, diff: &FileDiff) {
         .show(ui, |ui| {
             ui.horizontal(|ui| {
                 ui.label(
-                    RichText::new(
+                    RichText::new(tr(
+                        lang,
                         "Tip: Click any added (+) or removed (-) line to select individual lines for partial Staging / Unstaging / Reverting.",
-                    )
+                        "Suggerimento: Clicca su qualsiasi riga aggiunta (+) o rimossa (-) per selezionare singole righe per Stage / Unstage / Ripristino parziale.",
+                    ))
                     .size(11.0)
                     .color(VsCodeTheme::TEXT_MUTED),
                 );
@@ -338,6 +386,7 @@ fn render_hunk_block(
     hunk_idx: usize,
     hunk: &DiffHunk,
 ) {
+    let lang = state.settings.language;
     let selected_count = state
         .selected_hunk_lines
         .get(&hunk_idx)
@@ -380,10 +429,19 @@ fn render_hunk_block(
                             ui,
                             "+ Stage Hunk",
                             VsCodeTheme::ACCENT_BLUE,
-                            "Stage this entire hunk (git apply --cached)",
+                            tr(
+                                lang,
+                                "Stage this entire hunk (git apply --cached)",
+                                "Aggiungi questo intero hunk allo stage (git apply --cached)",
+                            ),
                         ) {
                             if let Some(patch) = diff.build_hunk_patch(hunk_idx) {
-                                state.apply_diff_patch(patch, true, false, "Staging hunk...");
+                                state.apply_diff_patch(
+                                    patch,
+                                    true,
+                                    false,
+                                    tr(lang, "Staging hunk...", "Aggiunta hunk allo stage..."),
+                                );
                             }
                         }
                     }
@@ -393,10 +451,23 @@ fn render_hunk_block(
                             ui,
                             "- Unstage Hunk",
                             VsCodeTheme::ACCENT_BLUE,
-                            "Unstage this entire hunk (git apply --cached --reverse)",
+                            tr(
+                                lang,
+                                "Unstage this entire hunk (git apply --cached --reverse)",
+                                "Rimuovi questo intero hunk dallo stage (git apply --cached --reverse)",
+                            ),
                         ) {
                             if let Some(patch) = diff.build_hunk_patch(hunk_idx) {
-                                state.apply_diff_patch(patch, true, true, "Unstaging hunk...");
+                                state.apply_diff_patch(
+                                    patch,
+                                    true,
+                                    true,
+                                    tr(
+                                        lang,
+                                        "Unstaging hunk...",
+                                        "Rimozione hunk dallo stage...",
+                                    ),
+                                );
                             }
                         }
                     }
@@ -404,12 +475,21 @@ fn render_hunk_block(
                     if diff.target.can_revert() {
                         if hunk_pill_button(
                             ui,
-                            "Revert Hunk",
+                            tr(lang, "Revert Hunk", "Ripristina Hunk"),
                             Color32::from_rgb(0x8E, 0x34, 0x2B),
-                            "Discard changes in this hunk from Working Tree (git apply --reverse)",
+                            tr(
+                                lang,
+                                "Discard changes in this hunk from Working Tree (git apply --reverse)",
+                                "Annulla le modifiche di questo hunk nel Working Tree (git apply --reverse)",
+                            ),
                         ) {
                             if let Some(patch) = diff.build_hunk_patch(hunk_idx) {
-                                state.apply_diff_patch(patch, false, true, "Reverting hunk...");
+                                state.apply_diff_patch(
+                                    patch,
+                                    false,
+                                    true,
+                                    tr(lang, "Reverting hunk...", "Ripristino hunk..."),
+                                );
                             }
                         }
                     }
@@ -419,7 +499,7 @@ fn render_hunk_block(
                         ui.separator();
                         if ui
                             .small_button(
-                                RichText::new("Clear")
+                                RichText::new(tr(lang, "Clear", "Pulisci"))
                                     .size(11.0)
                                     .color(VsCodeTheme::TEXT_MUTED),
                             )
@@ -429,12 +509,19 @@ fn render_hunk_block(
                         }
 
                         if diff.target.can_revert() {
-                            let lbl = format!("Revert Selected ({})", selected_count);
+                            let lbl = match lang {
+                                Language::En => format!("Revert Selected ({})", selected_count),
+                                Language::It => format!("Ripristina Selezionate ({})", selected_count),
+                            };
                             if hunk_pill_button(
                                 ui,
                                 &lbl,
                                 Color32::from_rgb(0xA1, 0x3A, 0x2E),
-                                "Revert only the selected lines in Working Tree",
+                                tr(
+                                    lang,
+                                    "Revert only the selected lines in Working Tree",
+                                    "Ripristina solo le righe selezionate nel Working Tree",
+                                ),
                             ) {
                                 if let Some(sel) = state.selected_hunk_lines.get(&hunk_idx) {
                                     if let Some(patch) =
@@ -444,7 +531,11 @@ fn render_hunk_block(
                                             patch,
                                             false,
                                             true,
-                                            "Reverting selected lines...",
+                                            tr(
+                                                lang,
+                                                "Reverting selected lines...",
+                                                "Ripristino righe selezionate...",
+                                            ),
                                         );
                                     }
                                 }
@@ -452,12 +543,19 @@ fn render_hunk_block(
                         }
 
                         if diff.target.can_stage() {
-                            let lbl = format!("+ Stage Selected ({})", selected_count);
+                            let lbl = match lang {
+                                Language::En => format!("+ Stage Selected ({})", selected_count),
+                                Language::It => format!("+ Stage Selezionate ({})", selected_count),
+                            };
                             if hunk_pill_button(
                                 ui,
                                 &lbl,
                                 Color32::from_rgb(0x1E, 0x7A, 0x3A),
-                                "Stage only the selected lines (git apply --cached)",
+                                tr(
+                                    lang,
+                                    "Stage only the selected lines (git apply --cached)",
+                                    "Aggiungi allo stage solo le righe selezionate (git apply --cached)",
+                                ),
                             ) {
                                 if let Some(sel) = state.selected_hunk_lines.get(&hunk_idx) {
                                     if let Some(patch) =
@@ -467,7 +565,11 @@ fn render_hunk_block(
                                             patch,
                                             true,
                                             false,
-                                            "Staging selected lines...",
+                                            tr(
+                                                lang,
+                                                "Staging selected lines...",
+                                                "Aggiunta righe selezionate allo stage...",
+                                            ),
                                         );
                                     }
                                 }
@@ -475,12 +577,19 @@ fn render_hunk_block(
                         }
 
                         if diff.target.can_unstage() {
-                            let lbl = format!("- Unstage Selected ({})", selected_count);
+                            let lbl = match lang {
+                                Language::En => format!("- Unstage Selected ({})", selected_count),
+                                Language::It => format!("- Unstage Selezionate ({})", selected_count),
+                            };
                             if hunk_pill_button(
                                 ui,
                                 &lbl,
                                 Color32::from_rgb(0x9C, 0x64, 0x16),
-                                "Unstage only the selected lines (git apply --cached --reverse)",
+                                tr(
+                                    lang,
+                                    "Unstage only the selected lines (git apply --cached --reverse)",
+                                    "Rimuovi dallo stage solo le righe selezionate (git apply --cached --reverse)",
+                                ),
                             ) {
                                 if let Some(sel) = state.selected_hunk_lines.get(&hunk_idx) {
                                     if let Some(patch) =
@@ -490,7 +599,11 @@ fn render_hunk_block(
                                             patch,
                                             true,
                                             true,
-                                            "Unstaging selected lines...",
+                                            tr(
+                                                lang,
+                                                "Unstaging selected lines...",
+                                                "Rimozione righe selezionate dallo stage...",
+                                            ),
                                         );
                                     }
                                 }
@@ -813,6 +926,7 @@ fn render_commit_inspector_tab(
     state: &mut AppState,
     details: &CommitDetails,
 ) {
+    let lang = state.settings.language;
     egui::ScrollArea::vertical()
         .id_salt("commit_inspector_scroll")
         .auto_shrink([false, false])
@@ -830,21 +944,34 @@ fn render_commit_inspector_tab(
                     );
                     ui.add_space(4.0);
                     ui.label(
-                        RichText::new(format!("Author: {} <{}>", details.author, details.email))
-                            .size(12.5)
-                            .color(VsCodeTheme::TEXT_PRIMARY),
+                        RichText::new(format!(
+                            "{}: {} <{}>",
+                            tr(lang, "Author", "Autore"),
+                            details.author,
+                            details.email
+                        ))
+                        .size(12.5)
+                        .color(VsCodeTheme::TEXT_PRIMARY),
                     );
                     ui.label(
-                        RichText::new(format!("Date:   {}", details.date))
-                            .size(12.0)
-                            .color(VsCodeTheme::TEXT_MUTED),
+                        RichText::new(format!(
+                            "{}:   {}",
+                            tr(lang, "Date", "Data"),
+                            details.date
+                        ))
+                        .size(12.0)
+                        .color(VsCodeTheme::TEXT_MUTED),
                     );
                     if !details.parents.is_empty() {
                         ui.label(
-                            RichText::new(format!("Parents: {}", details.parents.join(", ")))
-                                .size(12.0)
-                                .monospace()
-                                .color(VsCodeTheme::TEXT_MUTED),
+                            RichText::new(format!(
+                                "{}: {}",
+                                tr(lang, "Parents", "Genitori"),
+                                details.parents.join(", ")
+                            ))
+                            .size(12.0)
+                            .monospace()
+                            .color(VsCodeTheme::TEXT_MUTED),
                         );
                     }
 
@@ -866,7 +993,12 @@ fn render_commit_inspector_tab(
                     ui.add_space(14.0);
                     ui.label(
                         RichText::new(format!(
-                            "CHANGED FILES IN COMMIT ({})",
+                            "{} ({})",
+                            tr(
+                                lang,
+                                "CHANGED FILES IN COMMIT",
+                                "FILE MODIFICATI NEL COMMIT"
+                            ),
                             details.files.len()
                         ))
                         .size(11.5)
@@ -887,7 +1019,11 @@ fn render_commit_inspector_tab(
                             .color(file.kind.color()),
                         );
                         if resp
-                            .on_hover_text("Click to open file diff for this commit")
+                            .on_hover_text(tr(
+                                lang,
+                                "Click to open file diff for this commit",
+                                "Clicca per aprire il diff del file per questo commit",
+                            ))
                             .clicked()
                         {
                             state.open_diff_target(DiffTarget::Commit {
@@ -907,10 +1043,11 @@ fn render_file_editor_tab(
     tab_idx: usize,
     path: &str,
 ) {
+    let lang = state.settings.language;
     ui.horizontal(|ui| {
         ui.add_space(10.0);
         ui.label(
-            RichText::new(format!("Editing: {}", path))
+            RichText::new(format!("{}: {}", tr(lang, "Editing", "Modifica"), path))
                 .size(12.0)
                 .color(VsCodeTheme::TEXT_MUTED),
         );
@@ -919,7 +1056,7 @@ fn render_file_editor_tab(
             if codicon_text_button(
                 ui,
                 Codicon::Save,
-                "Save (Ctrl+S)",
+                tr(lang, "Save (Ctrl+S)", "Salva (Ctrl+S)"),
                 VsCodeTheme::ACCENT_BLUE,
                 Color32::WHITE,
                 Vec2::new(115.0, 24.0),
@@ -955,6 +1092,7 @@ fn render_file_editor_tab(
 }
 
 fn render_empty_editor_watermark(ui: &mut egui::Ui, state: &mut AppState) {
+    let lang = state.settings.language;
     ui.centered_and_justified(|ui| {
         ui.vertical_centered(|ui| {
             let top_pad = (ui.available_height() * 0.20).max(16.0);
@@ -992,15 +1130,19 @@ fn render_empty_editor_watermark(ui: &mut egui::Ui, state: &mut AppState) {
             );
             ui.add_space(4.0);
             ui.label(
-                RichText::new("By Fabio Rotondo")
+                RichText::new(tr(lang, "By Fabio Rotondo", "Di Fabio Rotondo"))
                     .size(13.0)
                     .color(VsCodeTheme::TEXT_MUTED),
             );
             ui.add_space(14.0);
             ui.label(
-                RichText::new("This software is Open Source under the MIT license.")
-                    .size(12.5)
-                    .color(VsCodeTheme::TEXT_MUTED),
+                RichText::new(tr(
+                    lang,
+                    "This software is Open Source under the MIT license.",
+                    "Questo software è Open Source sotto licenza MIT.",
+                ))
+                .size(12.5)
+                .color(VsCodeTheme::TEXT_MUTED),
             );
             ui.add_space(8.0);
             let link_resp = ui.hyperlink_to(
@@ -1012,31 +1154,47 @@ fn render_empty_editor_watermark(ui: &mut egui::Ui, state: &mut AppState) {
             }
             ui.add_space(20.0);
             ui.label(
-                RichText::new("Click any file in the Source Control sidebar to inspect its Diff")
-                    .size(13.0)
-                    .color(VsCodeTheme::TEXT_MUTED),
+                RichText::new(tr(
+                    lang,
+                    "Click any file in the Source Control sidebar to inspect its Diff",
+                    "Clicca su qualsiasi file nella barra Controllo Sorgente per ispezionarne il Diff",
+                ))
+                .size(13.0)
+                .color(VsCodeTheme::TEXT_MUTED),
             );
             ui.add_space(16.0);
             ui.label(
-                RichText::new("Shortcuts:")
+                RichText::new(tr(lang, "Shortcuts:", "Scorciatoie:"))
                     .size(12.0)
                     .strong()
                     .color(VsCodeTheme::TEXT_MUTED),
             );
             ui.label(
-                RichText::new("- Ctrl+Shift+P  :  Open Git Command Palette / Quick Pick")
-                    .size(12.0)
-                    .color(VsCodeTheme::TEXT_DIM),
+                RichText::new(tr(
+                    lang,
+                    "- Ctrl+Shift+P  :  Open Git Command Palette / Quick Pick",
+                    "- Ctrl+Shift+P  :  Apri Palette Comandi Git / Quick Pick",
+                ))
+                .size(12.0)
+                .color(VsCodeTheme::TEXT_DIM),
             );
             ui.label(
-                RichText::new("- Ctrl+Enter    :  Commit staged/working changes")
-                    .size(12.0)
-                    .color(VsCodeTheme::TEXT_DIM),
+                RichText::new(tr(
+                    lang,
+                    "- Ctrl+Enter    :  Commit staged/working changes",
+                    "- Ctrl+Invio    :  Esegui commit delle modifiche",
+                ))
+                .size(12.0)
+                .color(VsCodeTheme::TEXT_DIM),
             );
             ui.label(
-                RichText::new("- Click Branch in Status Bar  :  Checkout / Create Branch")
-                    .size(12.0)
-                    .color(VsCodeTheme::TEXT_DIM),
+                RichText::new(tr(
+                    lang,
+                    "- Click Branch in Status Bar  :  Checkout / Create Branch",
+                    "- Clicca sul Branch nella Barra di Stato  :  Checkout / Crea Branch",
+                ))
+                .size(12.0)
+                .color(VsCodeTheme::TEXT_DIM),
             );
 
             if state.repo_path.is_none() {
@@ -1045,7 +1203,11 @@ fn render_empty_editor_watermark(ui: &mut egui::Ui, state: &mut AppState) {
                 if codicon_text_button(
                     ui,
                     Codicon::Folder,
-                    "Open Repository Folder...",
+                    tr(
+                        lang,
+                        "Open Repository Folder...",
+                        "Apri Cartella Repository...",
+                    ),
                     VsCodeTheme::ACCENT_BLUE,
                     Color32::WHITE,
                     Vec2::new(220.0, 30.0),

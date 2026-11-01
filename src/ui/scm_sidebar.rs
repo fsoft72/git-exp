@@ -1,5 +1,6 @@
 use crate::git::ops::{self, CommitVariant};
 use crate::git::status::{ChangeGroup, FileChange, FileStatusKind};
+use crate::i18n::{Language, tr};
 use crate::settings::ScmFileViewMode;
 use crate::state::{ActiveSidebarPanel, AppState, QuickPickKind, QuickPickState};
 use crate::theme::{
@@ -29,12 +30,13 @@ pub fn render_sidebar(ctx: &egui::Context, state: &mut AppState) {
 }
 
 fn render_source_control_panel(ui: &mut egui::Ui, state: &mut AppState) {
+    let lang = state.settings.language;
     // 1. Top Header "SOURCE CONTROL" + Toolbar icone vettoriali Codicon
     ui.add_space(4.0);
     ui.horizontal(|ui| {
         ui.add_space(10.0);
         ui.label(
-            RichText::new("SOURCE CONTROL")
+            RichText::new(tr(lang, "SOURCE CONTROL", "CONTROLLO SORGENTE"))
                 .size(11.0)
                 .strong()
                 .color(VsCodeTheme::TEXT_PRIMARY),
@@ -66,7 +68,11 @@ fn render_source_control_panel(ui: &mut egui::Ui, state: &mut AppState) {
                     },
                 );
             }
-            let more_resp = more_resp.on_hover_text("Views and More Actions...");
+            let more_resp = more_resp.on_hover_text(tr(
+                lang,
+                "Views and More Actions...",
+                "Viste e Altre Azioni...",
+            ));
             if more_resp.clicked() {
                 ui.memory_mut(|m| m.toggle_popup(more_id));
             }
@@ -82,20 +88,32 @@ fn render_source_control_panel(ui: &mut egui::Ui, state: &mut AppState) {
             );
 
             // Refresh button
-            if codicon_button(ui, Codicon::Refresh, "Refresh (Git Status)") {
+            if codicon_button(
+                ui,
+                Codicon::Refresh,
+                tr(lang, "Refresh (Git Status)", "Aggiorna (Stato Git)"),
+            ) {
                 state.trigger_refresh();
             }
 
             // Commit shortcut button
-            if codicon_button(ui, Codicon::Check, "Commit (Ctrl+Enter)") {
+            if codicon_button(
+                ui,
+                Codicon::Check,
+                tr(lang, "Commit (Ctrl+Enter)", "Commit (Ctrl+Invio)"),
+            ) {
                 let variant = state.commit_action_variant;
                 state.execute_commit(variant);
             }
 
             // Toggle List / Tree View
             let (mode_icon, mode_tip) = match state.settings.file_view_mode {
-                ScmFileViewMode::List => (Codicon::ListTree, "View as Tree"),
-                ScmFileViewMode::Tree => (Codicon::ListFlat, "View as List"),
+                ScmFileViewMode::List => {
+                    (Codicon::ListTree, tr(lang, "View as Tree", "Vista ad Albero"))
+                }
+                ScmFileViewMode::Tree => {
+                    (Codicon::ListFlat, tr(lang, "View as List", "Vista Elenco"))
+                }
             };
             if codicon_button(ui, mode_icon, mode_tip) {
                 state.settings.file_view_mode = match state.settings.file_view_mode {
@@ -130,7 +148,7 @@ fn render_source_control_panel(ui: &mut egui::Ui, state: &mut AppState) {
                 render_change_group_section(
                     ui,
                     state,
-                    "MERGE CHANGES",
+                    tr(lang, "MERGE CHANGES", "MODIFICHE DI MERGE"),
                     ChangeGroup::Merge,
                     &merge_list,
                 );
@@ -142,7 +160,7 @@ fn render_source_control_panel(ui: &mut egui::Ui, state: &mut AppState) {
                 render_change_group_section(
                     ui,
                     state,
-                    "STAGED CHANGES",
+                    tr(lang, "STAGED CHANGES", "MODIFICHE IN STAGE"),
                     ChangeGroup::Staged,
                     &staged_list,
                 );
@@ -153,7 +171,7 @@ fn render_source_control_panel(ui: &mut egui::Ui, state: &mut AppState) {
             render_change_group_section(
                 ui,
                 state,
-                "CHANGES",
+                tr(lang, "CHANGES", "MODIFICHE"),
                 ChangeGroup::WorkingTree,
                 &working_list,
             );
@@ -166,6 +184,7 @@ fn render_source_control_panel(ui: &mut egui::Ui, state: &mut AppState) {
 }
 
 fn render_commit_box_area(ui: &mut egui::Ui, state: &mut AppState) {
+    let lang = state.settings.language;
     ui.horizontal(|ui| {
         ui.add_space(8.0);
         let avail_w = (ui.available_width() - 8.0).max(120.0);
@@ -195,10 +214,16 @@ fn render_commit_box_area(ui: &mut egui::Ui, state: &mut AppState) {
                 .corner_radius(CornerRadius::same(3))
                 .inner_margin(egui::Margin::symmetric(6, 5))
                 .show(ui, |ui| {
-                    let hint = format!(
-                        "Message (Ctrl+Enter to commit on '{}')",
-                        state.status.head_name
-                    );
+                    let hint = match lang {
+                        Language::En => format!(
+                            "Message (Ctrl+Enter to commit on '{}')",
+                            state.status.head_name
+                        ),
+                        Language::It => format!(
+                            "Messaggio (Ctrl+Invio per commit su '{}')",
+                            state.status.head_name
+                        ),
+                    };
                     let te = egui::TextEdit::multiline(&mut state.commit_message)
                         .hint_text(
                             RichText::new(hint)
@@ -230,7 +255,11 @@ fn render_commit_box_area(ui: &mut egui::Ui, state: &mut AppState) {
                                     .size(11.5)
                                     .color(VsCodeTheme::TEXT_PRIMARY),
                             )
-                            .on_hover_text("Amend previous commit (git commit --amend)")
+                            .on_hover_text(tr(
+                                lang,
+                                "Amend previous commit (git commit --amend)",
+                                "Modifica il commit precedente (git commit --amend)",
+                            ))
                             .changed()
                         {
                             state.commit_amend = amend;
@@ -255,9 +284,11 @@ fn render_commit_box_area(ui: &mut egui::Ui, state: &mut AppState) {
                                     .size(11.0)
                                     .color(counter_color),
                             )
-                            .on_hover_text(
+                            .on_hover_text(tr(
+                                lang,
                                 "Remaining characters on subject line (50 characters recommended)",
-                            );
+                                "Caratteri rimanenti nella prima riga (50 caratteri consigliati)",
+                            ));
                         });
                     });
                 });
@@ -275,7 +306,7 @@ fn render_commit_box_area(ui: &mut egui::Ui, state: &mut AppState) {
                     CommitVariant::Normal if state.commit_amend => "Commit (Amend)",
                     CommitVariant::Normal => "Commit",
                     CommitVariant::Amend => "Commit (Amend)",
-                    CommitVariant::SignOff => "Commit (Signed Off)",
+                    CommitVariant::SignOff => tr(lang, "Commit (Signed Off)", "Commit (Firmato)"),
                     CommitVariant::CommitAndPush => "Commit & Push",
                     CommitVariant::CommitAndSync => "Commit & Sync",
                 };
@@ -327,7 +358,11 @@ fn render_commit_box_area(ui: &mut egui::Ui, state: &mut AppState) {
                         Color32::WHITE,
                     );
                 }
-                let dd_resp = dd_resp.on_hover_text("More Commit Actions...");
+                let dd_resp = dd_resp.on_hover_text(tr(
+                    lang,
+                    "More Commit Actions...",
+                    "Altre Azioni di Commit...",
+                ));
                 if dd_resp.clicked() {
                     ui.memory_mut(|m| m.toggle_popup(dd_id));
                 }
@@ -349,7 +384,10 @@ fn render_commit_box_area(ui: &mut egui::Ui, state: &mut AppState) {
                             state.commit_amend = true;
                             state.execute_commit(CommitVariant::Amend);
                         }
-                        if ui.button("Commit (Signed Off)").clicked() {
+                        if ui
+                            .button(tr(lang, "Commit (Signed Off)", "Commit (Firmato)"))
+                            .clicked()
+                        {
                             state.commit_action_variant = CommitVariant::SignOff;
                             state.execute_commit(CommitVariant::SignOff);
                         }
@@ -373,28 +411,45 @@ fn render_commit_box_area(ui: &mut egui::Ui, state: &mut AppState) {
                 if codicon_text_button(
                     ui,
                     Codicon::CloudUpload,
-                    "Publish Branch",
+                    tr(lang, "Publish Branch", "Pubblica Branch"),
                     VsCodeTheme::ACCENT_BLUE,
                     Color32::WHITE,
                     Vec2::new(avail_w, 25.0),
                     CornerRadius::same(3),
                 )
-                .on_hover_text("Publish current branch to origin")
+                .on_hover_text(tr(
+                    lang,
+                    "Publish current branch to origin",
+                    "Pubblica il branch corrente su origin",
+                ))
                 .clicked()
                 {
                     let br = state.status.head_name.clone();
-                    state.spawn_git_task("Publishing branch...", move |repo| {
+                    let busy_msg = tr(lang, "Publishing branch...", "Pubblicazione branch...");
+                    state.spawn_git_task(busy_msg, move |repo| {
                         ops::push(repo, Some(&br), false)
-                            .map(|l| (format!("Branch '{}' pubblicato su origin", br), vec![l]))
+                            .map(|l| {
+                                let msg = match lang {
+                                    Language::En => format!("Branch '{}' published to origin", br),
+                                    Language::It => format!("Branch '{}' pubblicato su origin", br),
+                                };
+                                (msg, vec![l])
+                            })
                             .map_err(|(e, l)| (e, vec![l]))
                     });
                 }
             } else if state.status.ahead > 0 || state.status.behind > 0 {
                 ui.add_space(4.0);
-                let sync_text = format!(
-                    "Sync Changes ({} down, {} up)",
-                    state.status.behind, state.status.ahead
-                );
+                let sync_text = match lang {
+                    Language::En => format!(
+                        "Sync Changes ({} down, {} up)",
+                        state.status.behind, state.status.ahead
+                    ),
+                    Language::It => format!(
+                        "Sincronizza Modifiche ({} giù, {} su)",
+                        state.status.behind, state.status.ahead
+                    ),
+                };
                 if codicon_text_button(
                     ui,
                     Codicon::Sync,
@@ -404,14 +459,20 @@ fn render_commit_box_area(ui: &mut egui::Ui, state: &mut AppState) {
                     Vec2::new(avail_w, 25.0),
                     CornerRadius::same(3),
                 )
-                .on_hover_text("Pull and Push commits with upstream")
+                .on_hover_text(tr(
+                    lang,
+                    "Pull and Push commits with upstream",
+                    "Esegui Pull e Push dei commit con upstream",
+                ))
                 .clicked()
                 {
                     let has_up = state.status.upstream.is_some();
                     let br = state.status.head_name.clone();
-                    state.spawn_git_task("Syncing changes...", move |repo| {
+                    let busy_msg = tr(lang, "Syncing changes...", "Sincronizzazione modifiche...");
+                    let done_msg = tr(lang, "Sync completed", "Sync completato");
+                    state.spawn_git_task(busy_msg, move |repo| {
                         ops::sync_repo(repo, has_up, &br)
-                            .map(|logs| ("Sync completato".to_string(), logs))
+                            .map(|logs| (done_msg.to_string(), logs))
                             .map_err(|(e, l)| (e, vec![l]))
                     });
                 }
@@ -427,7 +488,8 @@ fn render_change_group_section(
     group: ChangeGroup,
     changes: &[FileChange],
 ) {
-    let id = ui.make_persistent_id(format!("scm_group_{}", title));
+    let lang = state.settings.language;
+    let id = ui.make_persistent_id(format!("scm_group_{:?}", group));
     let mut collapsing =
         egui::collapsing_header::CollapsingState::load_with_default_open(ui.ctx(), id, true);
 
@@ -468,17 +530,29 @@ fn render_change_group_section(
         if is_hovered && !changes.is_empty() {
             match group {
                 ChangeGroup::Staged => {
-                    if codicon_button(ui, Codicon::Minus, "Unstage All Changes") {
+                    if codicon_button(
+                        ui,
+                        Codicon::Minus,
+                        tr(lang, "Unstage All Changes", "Rimuovi Tutto dallo Stage"),
+                    ) {
                         state.unstage_all();
                         action_triggered = true;
                     }
                 }
                 ChangeGroup::WorkingTree | ChangeGroup::Merge => {
-                    if codicon_button(ui, Codicon::Plus, "Stage All Changes") {
+                    if codicon_button(
+                        ui,
+                        Codicon::Plus,
+                        tr(lang, "Stage All Changes", "Aggiungi Tutto allo Stage"),
+                    ) {
                         state.stage_all();
                         action_triggered = true;
                     }
-                    if codicon_button(ui, Codicon::Discard, "Discard All Changes") {
+                    if codicon_button(
+                        ui,
+                        Codicon::Discard,
+                        tr(lang, "Discard All Changes", "Annulla Tutte le Modifiche"),
+                    ) {
                         state.quick_pick =
                             Some(QuickPickState::new(QuickPickKind::ConfirmDiscardAll));
                         action_triggered = true;
@@ -498,7 +572,7 @@ fn render_change_group_section(
             ui.horizontal(|ui| {
                 ui.add_space(22.0);
                 ui.label(
-                    RichText::new("No changes")
+                    RichText::new(tr(lang, "No changes", "Nessuna modifica"))
                         .size(12.0)
                         .italics()
                         .color(VsCodeTheme::TEXT_MUTED),
@@ -526,6 +600,7 @@ fn render_file_change_row(
     indent_px: f32,
     show_parent_dir: bool,
 ) {
+    let lang = state.settings.language;
     let row_h = 22.0;
     let avail_w = ui.available_width();
     let (rect, resp) = ui.allocate_exact_size(Vec2::new(avail_w, row_h), Sense::click());
@@ -607,22 +682,38 @@ fn render_file_change_row(
                 .strong()
                 .color(change.kind.color()),
         )
-        .on_hover_text(change.kind.label(change.group == ChangeGroup::Staged));
+        .on_hover_text(
+            change
+                .kind
+                .label(change.group == ChangeGroup::Staged, lang),
+        );
 
         if is_hovered {
             match change.group {
                 ChangeGroup::Staged => {
-                    if codicon_button(ui, Codicon::Minus, "Unstage Changes") {
+                    if codicon_button(
+                        ui,
+                        Codicon::Minus,
+                        tr(lang, "Unstage Changes", "Rimuovi dallo Stage"),
+                    ) {
                         state.unstage_file(change.path.clone());
                         button_clicked = true;
                     }
                 }
                 ChangeGroup::WorkingTree | ChangeGroup::Merge => {
-                    if codicon_button(ui, Codicon::Plus, "Stage Changes") {
+                    if codicon_button(
+                        ui,
+                        Codicon::Plus,
+                        tr(lang, "Stage Changes", "Aggiungi allo Stage"),
+                    ) {
                         state.stage_file(change.path.clone());
                         button_clicked = true;
                     }
-                    if codicon_button(ui, Codicon::Discard, "Discard Changes") {
+                    if codicon_button(
+                        ui,
+                        Codicon::Discard,
+                        tr(lang, "Discard Changes", "Annulla Modifiche"),
+                    ) {
                         state.quick_pick = Some(QuickPickState::new(
                             QuickPickKind::ConfirmDiscardFile {
                                 path: change.path.clone(),
@@ -635,7 +726,7 @@ fn render_file_change_row(
             }
 
             if change.kind != FileStatusKind::Deleted
-                && codicon_button(ui, Codicon::OpenFile, "Open File")
+                && codicon_button(ui, Codicon::OpenFile, tr(lang, "Open File", "Apri File"))
             {
                 state.open_file_in_editor(&change.path);
                 button_clicked = true;
@@ -650,17 +741,28 @@ fn render_file_change_row(
     // Context menu al click destro sulla riga del file
     resp.context_menu(|ui| {
         ui.set_min_width(180.0);
-        if ui.button("Open Changes (Diff)").clicked() {
+        if ui
+            .button(tr(lang, "Open Changes (Diff)", "Apri Modifiche (Diff)"))
+            .clicked()
+        {
             state.open_change_diff(change);
             ui.close_menu();
         }
-        if change.kind != FileStatusKind::Deleted && ui.button("Open File (Editor)").clicked() {
+        if change.kind != FileStatusKind::Deleted
+            && ui
+                .button(tr(lang, "Open File (Editor)", "Apri File (Editor)"))
+                .clicked()
+        {
             state.open_file_in_editor(&change.path);
             ui.close_menu();
         }
         if let Some(ref repo) = state.repo_path {
             let full_path = repo.join(&change.path);
-            if full_path.exists() && ui.button("Open in System App").clicked() {
+            if full_path.exists()
+                && ui
+                    .button(tr(lang, "Open in System App", "Apri nell'App di Sistema"))
+                    .clicked()
+            {
                 let _ = open::that(full_path);
                 ui.close_menu();
             }
@@ -668,17 +770,26 @@ fn render_file_change_row(
         ui.separator();
         match change.group {
             ChangeGroup::Staged => {
-                if ui.button("- Unstage Changes").clicked() {
+                if ui
+                    .button(tr(lang, "- Unstage Changes", "- Rimuovi dallo Stage"))
+                    .clicked()
+                {
                     state.unstage_file(change.path.clone());
                     ui.close_menu();
                 }
             }
             ChangeGroup::WorkingTree | ChangeGroup::Merge => {
-                if ui.button("+ Stage Changes").clicked() {
+                if ui
+                    .button(tr(lang, "+ Stage Changes", "+ Aggiungi allo Stage"))
+                    .clicked()
+                {
                     state.stage_file(change.path.clone());
                     ui.close_menu();
                 }
-                if ui.button("Discard Changes...").clicked() {
+                if ui
+                    .button(tr(lang, "Discard Changes...", "Annulla Modifiche..."))
+                    .clicked()
+                {
                     state.quick_pick = Some(QuickPickState::new(
                         QuickPickKind::ConfirmDiscardFile {
                             path: change.path.clone(),
@@ -690,7 +801,10 @@ fn render_file_change_row(
             }
         }
         ui.separator();
-        if ui.button("Copy Relative Path").clicked() {
+        if ui
+            .button(tr(lang, "Copy Relative Path", "Copia Percorso Relativo"))
+            .clicked()
+        {
             ui.ctx().copy_text(change.path.clone());
             ui.close_menu();
         }
@@ -788,19 +902,28 @@ fn render_tree_node_recursive(
 
         let mut folder_action = false;
         if is_hovered {
+            let lang = state.settings.language;
             row_ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                 ui.add_space(8.0);
                 let mut folder_paths = Vec::new();
                 subnode.collect_all_paths(&mut folder_paths);
                 match group {
                     ChangeGroup::Staged => {
-                        if codicon_button(ui, Codicon::Minus, "Unstage Folder") {
+                        if codicon_button(
+                            ui,
+                            Codicon::Minus,
+                            tr(lang, "Unstage Folder", "Rimuovi Cartella dallo Stage"),
+                        ) {
                             state.unstage_paths_batch(folder_paths);
                             folder_action = true;
                         }
                     }
                     ChangeGroup::WorkingTree | ChangeGroup::Merge => {
-                        if codicon_button(ui, Codicon::Plus, "Stage Folder") {
+                        if codicon_button(
+                            ui,
+                            Codicon::Plus,
+                            tr(lang, "Stage Folder", "Aggiungi Cartella allo Stage"),
+                        ) {
                             state.stage_paths_batch(folder_paths);
                             folder_action = true;
                         }
@@ -828,6 +951,7 @@ fn render_tree_node_recursive(
 }
 
 fn render_collapsible_graph_section(ui: &mut egui::Ui, state: &mut AppState) {
+    let lang = state.settings.language;
     let id = ui.make_persistent_id("scm_source_control_graph_section");
     let mut collapsing = egui::collapsing_header::CollapsingState::load_with_default_open(
         ui.ctx(),
@@ -857,10 +981,14 @@ fn render_collapsible_graph_section(ui: &mut egui::Ui, state: &mut AppState) {
     };
     draw_inline_codicon(&mut hdr_ui, chevron, 16.0, VsCodeTheme::TEXT_PRIMARY);
     hdr_ui.label(
-        RichText::new("SOURCE CONTROL GRAPH")
-            .size(11.0)
-            .strong()
-            .color(VsCodeTheme::TEXT_PRIMARY),
+        RichText::new(tr(
+            lang,
+            "SOURCE CONTROL GRAPH",
+            "GRAFO CONTROLLO SORGENTE",
+        ))
+        .size(11.0)
+        .strong()
+        .color(VsCodeTheme::TEXT_PRIMARY),
     );
 
     let mut btn_clicked = false;
@@ -876,7 +1004,13 @@ fn render_collapsible_graph_section(ui: &mut egui::Ui, state: &mut AppState) {
                 .color(VsCodeTheme::ACCENT_BLUE),
             );
         }
-        if hovered && codicon_button(ui, Codicon::Refresh, "Refresh Graph") {
+        if hovered
+            && codicon_button(
+                ui,
+                Codicon::Refresh,
+                tr(lang, "Refresh Graph", "Aggiorna Grafo"),
+            )
+        {
             state.trigger_refresh();
             btn_clicked = true;
         }
@@ -895,18 +1029,27 @@ fn render_collapsible_graph_section(ui: &mut egui::Ui, state: &mut AppState) {
 }
 
 fn render_full_graph_sidebar(ui: &mut egui::Ui, state: &mut AppState) {
+    let lang = state.settings.language;
     ui.add_space(6.0);
     ui.horizontal(|ui| {
         ui.add_space(10.0);
         ui.label(
-            RichText::new("SOURCE CONTROL GRAPH")
-                .size(11.0)
-                .strong()
-                .color(VsCodeTheme::TEXT_PRIMARY),
+            RichText::new(tr(
+                lang,
+                "SOURCE CONTROL GRAPH",
+                "GRAFO CONTROLLO SORGENTE",
+            ))
+            .size(11.0)
+            .strong()
+            .color(VsCodeTheme::TEXT_PRIMARY),
         );
         ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
             ui.add_space(8.0);
-            if codicon_button(ui, Codicon::Refresh, "Refresh Graph") {
+            if codicon_button(
+                ui,
+                Codicon::Refresh,
+                tr(lang, "Refresh Graph", "Aggiorna Grafo"),
+            ) {
                 state.trigger_refresh();
             }
         });
@@ -923,14 +1066,19 @@ fn render_full_graph_sidebar(ui: &mut egui::Ui, state: &mut AppState) {
 }
 
 fn render_repositories_sidebar(ui: &mut egui::Ui, ctx: &egui::Context, state: &mut AppState) {
+    let lang = state.settings.language;
     ui.add_space(6.0);
     ui.horizontal(|ui| {
         ui.add_space(10.0);
         ui.label(
-            RichText::new("SOURCE CONTROL REPOSITORIES")
-                .size(11.0)
-                .strong()
-                .color(VsCodeTheme::TEXT_PRIMARY),
+            RichText::new(tr(
+                lang,
+                "SOURCE CONTROL REPOSITORIES",
+                "REPOSITORY CONTROLLO SORGENTE",
+            ))
+            .size(11.0)
+            .strong()
+            .color(VsCodeTheme::TEXT_PRIMARY),
         );
     });
     ui.add_space(6.0);
@@ -944,7 +1092,11 @@ fn render_repositories_sidebar(ui: &mut egui::Ui, ctx: &egui::Context, state: &m
             if codicon_text_button(
                 ui,
                 Codicon::Folder,
-                "Open Repository Folder...",
+                tr(
+                    lang,
+                    "Open Repository Folder...",
+                    "Apri Cartella Repository...",
+                ),
                 VsCodeTheme::ACCENT_BLUE,
                 Color32::WHITE,
                 Vec2::new(avail_w, 26.0),
@@ -963,7 +1115,7 @@ fn render_repositories_sidebar(ui: &mut egui::Ui, ctx: &egui::Context, state: &m
         ui.horizontal(|ui| {
             ui.add_space(10.0);
             ui.label(
-                RichText::new("RECENT REPOSITORIES")
+                RichText::new(tr(lang, "RECENT REPOSITORIES", "REPOSITORY RECENTI"))
                     .size(11.0)
                     .strong()
                     .color(VsCodeTheme::TEXT_MUTED),
@@ -1009,10 +1161,14 @@ fn render_repositories_sidebar(ui: &mut egui::Ui, ctx: &egui::Context, state: &m
         ui.horizontal(|ui| {
             ui.add_space(10.0);
             ui.label(
-                RichText::new(format!("BRANCHES ({})", state.status.branches.len()))
-                    .size(11.0)
-                    .strong()
-                    .color(VsCodeTheme::TEXT_MUTED),
+                RichText::new(format!(
+                    "{} ({})",
+                    tr(lang, "BRANCHES", "BRANCH"),
+                    state.status.branches.len()
+                ))
+                .size(11.0)
+                .strong()
+                .color(VsCodeTheme::TEXT_MUTED),
             );
         });
         for br in state.status.branches.clone() {
@@ -1031,24 +1187,40 @@ fn render_repositories_sidebar(ui: &mut egui::Ui, ctx: &egui::Context, state: &m
                 } else {
                     format!("{} ({})", br.name, br.commit_short)
                 };
-                let resp = ui
-                    .selectable_label(br.is_current, label_text)
-                    .on_hover_text(format!("{}\nRight-click for branch actions", br.subject));
+                let resp = ui.selectable_label(br.is_current, label_text).on_hover_text(
+                    format!(
+                        "{}\n{}",
+                        br.subject,
+                        tr(
+                            lang,
+                            "Right-click for branch actions",
+                            "Click destro per le azioni sul branch"
+                        )
+                    ),
+                );
                 if resp.clicked() && !br.is_current {
                     let name = br.name.clone();
                     let is_rem = br.is_remote;
-                    state.spawn_git_task("Checking out branch...", move |repo| {
+                    let busy_msg = tr(lang, "Checking out branch...", "Checkout del branch...");
+                    state.spawn_git_task(busy_msg, move |repo| {
                         ops::checkout_branch(repo, &name, is_rem)
-                            .map(|l| (format!("Checkout su '{}'", name), vec![l]))
+                            .map(|l| {
+                                let msg = match lang {
+                                    Language::En => format!("Switched to '{}'", name),
+                                    Language::It => format!("Checkout su '{}'", name),
+                                };
+                                (msg, vec![l])
+                            })
                             .map_err(|(e, l)| (e, vec![l]))
                     });
                 }
                 resp.context_menu(|ui| {
                     ui.set_min_width(190.0);
-                    if ui
-                        .button(format!("Create Branch from '{}'...", br.name))
-                        .clicked()
-                    {
+                    let create_from_lbl = match lang {
+                        Language::En => format!("Create Branch from '{}'...", br.name),
+                        Language::It => format!("Crea Branch da '{}'...", br.name),
+                    };
+                    if ui.button(create_from_lbl).clicked() {
                         state.quick_pick =
                             Some(QuickPickState::new(QuickPickKind::CreateBranch {
                                 from_ref: Some(br.name.clone()),
@@ -1058,37 +1230,62 @@ fn render_repositories_sidebar(ui: &mut egui::Ui, ctx: &egui::Context, state: &m
                     if !br.is_current && ui.button(format!("Checkout '{}'", br.name)).clicked() {
                         let name = br.name.clone();
                         let is_rem = br.is_remote;
-                        state.spawn_git_task("Checking out branch...", move |repo| {
+                        let busy_msg =
+                            tr(lang, "Checking out branch...", "Checkout del branch...");
+                        state.spawn_git_task(busy_msg, move |repo| {
                             ops::checkout_branch(repo, &name, is_rem)
-                                .map(|l| (format!("Checkout su '{}'", name), vec![l]))
+                                .map(|l| {
+                                    let msg = match lang {
+                                        Language::En => format!("Switched to '{}'", name),
+                                        Language::It => format!("Checkout su '{}'", name),
+                                    };
+                                    (msg, vec![l])
+                                })
                                 .map_err(|(e, l)| (e, vec![l]))
                         });
                         ui.close_menu();
                     }
-                    if !br.is_current
-                        && ui
-                            .button(format!(
-                                "Merge '{}' into '{}'",
-                                br.name, state.status.head_name
-                            ))
-                            .clicked()
-                    {
+                    let merge_lbl = match lang {
+                        Language::En => {
+                            format!("Merge '{}' into '{}'", br.name, state.status.head_name)
+                        }
+                        Language::It => format!(
+                            "Esegui Merge di '{}' in '{}'",
+                            br.name, state.status.head_name
+                        ),
+                    };
+                    if !br.is_current && ui.button(merge_lbl).clicked() {
                         let name = br.name.clone();
-                        state.spawn_git_task("Merging branch...", move |repo| {
+                        let busy_msg = tr(lang, "Merging branch...", "Merge del branch...");
+                        state.spawn_git_task(busy_msg, move |repo| {
                             ops::merge_branch(repo, &name)
-                                .map(|l| (format!("Merge di '{}' completato", name), vec![l]))
+                                .map(|l| {
+                                    let msg = match lang {
+                                        Language::En => format!("Merged '{}'", name),
+                                        Language::It => format!("Merge di '{}' completato", name),
+                                    };
+                                    (msg, vec![l])
+                                })
                                 .map_err(|(e, l)| (e, vec![l]))
                         });
                         ui.close_menu();
                     }
-                    if !br.is_current
-                        && !br.is_remote
-                        && ui.button(format!("Delete Branch '{}'", br.name)).clicked()
-                    {
+                    let del_lbl = match lang {
+                        Language::En => format!("Delete Branch '{}'", br.name),
+                        Language::It => format!("Elimina Branch '{}'", br.name),
+                    };
+                    if !br.is_current && !br.is_remote && ui.button(del_lbl).clicked() {
                         let name = br.name.clone();
-                        state.spawn_git_task("Deleting branch...", move |repo| {
+                        let busy_msg = tr(lang, "Deleting branch...", "Eliminazione branch...");
+                        state.spawn_git_task(busy_msg, move |repo| {
                             ops::delete_branch(repo, &name, false)
-                                .map(|l| (format!("Branch '{}' eliminato", name), vec![l]))
+                                .map(|l| {
+                                    let msg = match lang {
+                                        Language::En => format!("Deleted branch '{}'", name),
+                                        Language::It => format!("Branch '{}' eliminato", name),
+                                    };
+                                    (msg, vec![l])
+                                })
                                 .map_err(|(e, l)| (e, vec![l]))
                         });
                         ui.close_menu();
@@ -1124,14 +1321,19 @@ fn render_repositories_sidebar(ui: &mut egui::Ui, ctx: &egui::Context, state: &m
 }
 
 fn render_settings_sidebar(ui: &mut egui::Ui, state: &mut AppState) {
+    let lang = state.settings.language;
     ui.add_space(6.0);
     ui.horizontal(|ui| {
         ui.add_space(10.0);
         ui.label(
-            RichText::new("SETTINGS - GIT CONFIGURATION")
-                .size(11.0)
-                .strong()
-                .color(VsCodeTheme::TEXT_PRIMARY),
+            RichText::new(tr(
+                lang,
+                "SETTINGS - GIT CONFIGURATION",
+                "IMPOSTAZIONI - CONFIGURAZIONE GIT",
+            ))
+            .size(11.0)
+            .strong()
+            .color(VsCodeTheme::TEXT_PRIMARY),
         );
     });
     ui.add_space(6.0);
@@ -1148,18 +1350,24 @@ fn render_settings_sidebar(ui: &mut egui::Ui, state: &mut AppState) {
                     let card_w = (ui.available_width() - 10.0).max(160.0);
                     ui.set_width(card_w);
 
-                    // Sezione 1: Git Status Refresh
+                    // Sezione 0: Language Selector (ENG / ITA, default ENG)
                     ui.label(
-                        RichText::new("Git: Auto Refresh Status")
-                            .size(12.5)
-                            .strong()
-                            .color(VsCodeTheme::TEXT_BRIGHT),
+                        RichText::new(tr(
+                            lang,
+                            "Application Language",
+                            "Lingua dell'Applicazione",
+                        ))
+                        .size(12.5)
+                        .strong()
+                        .color(VsCodeTheme::TEXT_BRIGHT),
                     );
                     ui.add_space(4.0);
                     ui.label(
-                        RichText::new(
-                            " Tempo di 'Refresh git status' automatico (in secondi).\n Imposta 0 per disabilitare il polling a tempo.",
-                        )
+                        RichText::new(tr(
+                            lang,
+                            "Select the user interface language (default: English).",
+                            "Seleziona la lingua dell'interfaccia utente (predefinita: Inglese).",
+                        ))
                         .size(11.5)
                         .color(VsCodeTheme::TEXT_MUTED),
                     );
@@ -1167,9 +1375,70 @@ fn render_settings_sidebar(ui: &mut egui::Ui, state: &mut AppState) {
 
                     ui.horizontal(|ui| {
                         ui.label(
-                            RichText::new("Intervallo (secondi):")
+                            RichText::new(tr(lang, "Language:", "Lingua:"))
                                 .size(12.0)
                                 .color(VsCodeTheme::TEXT_PRIMARY),
+                        );
+                        let mut current_lang = state.settings.language;
+                        egui::ComboBox::from_id_salt("settings_language_selector")
+                            .selected_text(current_lang.label())
+                            .width(150.0)
+                            .show_ui(ui, |ui| {
+                                ui.selectable_value(
+                                    &mut current_lang,
+                                    Language::En,
+                                    Language::En.label(),
+                                );
+                                ui.selectable_value(
+                                    &mut current_lang,
+                                    Language::It,
+                                    Language::It.label(),
+                                );
+                            });
+                        if current_lang != state.settings.language {
+                            state.settings.language = current_lang;
+                            state.settings.save();
+                        }
+                    });
+
+                    ui.add_space(14.0);
+                    ui.separator();
+                    ui.add_space(10.0);
+
+                    let lang = state.settings.language;
+
+                    // Sezione 1: Git Status Refresh
+                    ui.label(
+                        RichText::new(tr(
+                            lang,
+                            "Git: Auto Refresh Status",
+                            "Git: Aggiornamento Automatico Stato",
+                        ))
+                        .size(12.5)
+                        .strong()
+                        .color(VsCodeTheme::TEXT_BRIGHT),
+                    );
+                    ui.add_space(4.0);
+                    ui.label(
+                        RichText::new(tr(
+                            lang,
+                            "Automatic 'Refresh git status' interval (in seconds).\nSet to 0 to disable timed polling.",
+                            "Tempo di 'Refresh git status' automatico (in secondi).\nImposta 0 per disabilitare il polling a tempo.",
+                        ))
+                        .size(11.5)
+                        .color(VsCodeTheme::TEXT_MUTED),
+                    );
+                    ui.add_space(6.0);
+
+                    ui.horizontal(|ui| {
+                        ui.label(
+                            RichText::new(tr(
+                                lang,
+                                "Interval (seconds):",
+                                "Intervallo (secondi):",
+                            ))
+                            .size(12.0)
+                            .color(VsCodeTheme::TEXT_PRIMARY),
                         );
                         let mut secs = state.settings.refresh_interval_secs;
                         let drag = egui::DragValue::new(&mut secs)
@@ -1208,10 +1477,14 @@ fn render_settings_sidebar(ui: &mut egui::Ui, state: &mut AppState) {
 
                     // Sezione 2: Messaggio Status Bar vs Silent
                     ui.label(
-                        RichText::new("Git: Refresh Status Bar Notification")
-                            .size(12.5)
-                            .strong()
-                            .color(VsCodeTheme::TEXT_BRIGHT),
+                        RichText::new(tr(
+                            lang,
+                            "Git: Refresh Status Bar Notification",
+                            "Git: Notifica Aggiornamento nella Barra di Stato",
+                        ))
+                        .size(12.5)
+                        .strong()
+                        .color(VsCodeTheme::TEXT_BRIGHT),
                     );
                     ui.add_space(6.0);
 
@@ -1219,14 +1492,21 @@ fn render_settings_sidebar(ui: &mut egui::Ui, state: &mut AppState) {
                     if ui
                         .checkbox(
                             &mut show_msg,
-                            RichText::new("Show 'Refreshing Git status...' in Status Bar")
-                                .size(12.0)
-                                .color(VsCodeTheme::TEXT_PRIMARY),
+                            RichText::new(tr(
+                                lang,
+                                "Show 'Refreshing Git status...' in Status Bar",
+                                "Mostra 'Aggiornamento stato Git...' nella Barra di Stato",
+                            ))
+                            .size(12.0)
+                            .color(VsCodeTheme::TEXT_PRIMARY),
                         )
                         .changed()
                     {
                         state.settings.show_refresh_status_message = show_msg;
-                        if !show_msg && state.busy_label == "Refreshing Git status..." {
+                        if !show_msg
+                            && (state.busy_label == "Refreshing Git status..."
+                                || state.busy_label == "Aggiornamento stato Git...")
+                        {
                             state.is_busy = false;
                             state.busy_label.clear();
                         }
@@ -1234,9 +1514,17 @@ fn render_settings_sidebar(ui: &mut egui::Ui, state: &mut AppState) {
                     }
 
                     let mode_desc = if state.settings.show_refresh_status_message {
-                        "Stato attuale: VISIBILE (mostra spinner e messaggio nella Status Bar)"
+                        tr(
+                            lang,
+                            "Current mode: VISIBLE (shows spinner and message in the Status Bar)",
+                            "Stato attuale: VISIBILE (mostra spinner e messaggio nella Status Bar)",
+                        )
                     } else {
-                        "Stato attuale: SILENT (aggiorna in background senza messaggi nella Status Bar)"
+                        tr(
+                            lang,
+                            "Current mode: SILENT (refreshes in background without Status Bar messages)",
+                            "Stato attuale: SILENT (aggiorna in background senza messaggi nella Status Bar)",
+                        )
                     };
                     ui.add_space(2.0);
                     ui.label(
@@ -1256,16 +1544,20 @@ fn render_settings_sidebar(ui: &mut egui::Ui, state: &mut AppState) {
 
                     // Sezione 3: Altre preferenze UI
                     ui.label(
-                        RichText::new("Git: View & Commit Preferences")
-                            .size(12.5)
-                            .strong()
-                            .color(VsCodeTheme::TEXT_BRIGHT),
+                        RichText::new(tr(
+                            lang,
+                            "Git: View & Commit Preferences",
+                            "Git: Preferenze Vista e Commit",
+                        ))
+                        .size(12.5)
+                        .strong()
+                        .color(VsCodeTheme::TEXT_BRIGHT),
                     );
                     ui.add_space(6.0);
 
                     ui.horizontal(|ui| {
                         ui.label(
-                            RichText::new("Default View:")
+                            RichText::new(tr(lang, "Default View:", "Vista Predefinita:"))
                                 .size(12.0)
                                 .color(VsCodeTheme::TEXT_PRIMARY),
                         );
@@ -1273,7 +1565,7 @@ fn render_settings_sidebar(ui: &mut egui::Ui, state: &mut AppState) {
                             .radio_value(
                                 &mut state.settings.default_file_view_mode,
                                 ScmFileViewMode::Tree,
-                                RichText::new("Tree View")
+                                RichText::new(tr(lang, "Tree View", "Vista ad Albero"))
                                     .size(12.0)
                                     .color(VsCodeTheme::TEXT_PRIMARY),
                             )
@@ -1286,7 +1578,7 @@ fn render_settings_sidebar(ui: &mut egui::Ui, state: &mut AppState) {
                             .radio_value(
                                 &mut state.settings.default_file_view_mode,
                                 ScmFileViewMode::List,
-                                RichText::new("List View")
+                                RichText::new(tr(lang, "List View", "Vista Elenco"))
                                     .size(12.0)
                                     .color(VsCodeTheme::TEXT_PRIMARY),
                             )
@@ -1301,9 +1593,13 @@ fn render_settings_sidebar(ui: &mut egui::Ui, state: &mut AppState) {
                     if ui
                         .checkbox(
                             &mut state.settings.show_graph_section,
-                            RichText::new("Show Source Control Graph in Sidebar")
-                                .size(12.0)
-                                .color(VsCodeTheme::TEXT_PRIMARY),
+                            RichText::new(tr(
+                                lang,
+                                "Show Source Control Graph in Sidebar",
+                                "Mostra Grafo Controllo Sorgente nella Barra Laterale",
+                            ))
+                            .size(12.0)
+                            .color(VsCodeTheme::TEXT_PRIMARY),
                         )
                         .changed()
                     {
@@ -1313,9 +1609,13 @@ fn render_settings_sidebar(ui: &mut egui::Ui, state: &mut AppState) {
                     if ui
                         .checkbox(
                             &mut state.settings.commit_signoff,
-                            RichText::new("Always Sign Off Commits (--signoff)")
-                                .size(12.0)
-                                .color(VsCodeTheme::TEXT_PRIMARY),
+                            RichText::new(tr(
+                                lang,
+                                "Always Sign Off Commits (--signoff)",
+                                "Firma Sempre i Commit (--signoff)",
+                            ))
+                            .size(12.0)
+                            .color(VsCodeTheme::TEXT_PRIMARY),
                         )
                         .changed()
                     {
@@ -1327,19 +1627,24 @@ fn render_settings_sidebar(ui: &mut egui::Ui, state: &mut AppState) {
 }
 
 fn render_no_repo_welcome(ui: &mut egui::Ui, state: &mut AppState) {
+    let lang = state.settings.language;
     let ctx = ui.ctx().clone();
     ui.vertical_centered(|ui| {
         ui.add_space(24.0);
         ui.label(
-            RichText::new("The folder currently open doesn't have a Git repository.")
-                .size(12.5)
-                .color(VsCodeTheme::TEXT_PRIMARY),
+            RichText::new(tr(
+                lang,
+                "The folder currently open doesn't have a Git repository.",
+                "La cartella attualmente aperta non contiene un repository Git.",
+            ))
+            .size(12.5)
+            .color(VsCodeTheme::TEXT_PRIMARY),
         );
         ui.add_space(12.0);
         if codicon_text_button(
             ui,
             Codicon::Folder,
-            "Open Repository Folder",
+            tr(lang, "Open Repository Folder", "Apri Cartella Repository"),
             VsCodeTheme::ACCENT_BLUE,
             Color32::WHITE,
             Vec2::new(200.0, 28.0),
@@ -1356,7 +1661,7 @@ fn render_no_repo_welcome(ui: &mut egui::Ui, state: &mut AppState) {
         if codicon_text_button(
             ui,
             Codicon::GitBranch,
-            "Initialize Repository",
+            tr(lang, "Initialize Repository", "Inizializza Repository"),
             VsCodeTheme::ACCENT_BLUE,
             Color32::WHITE,
             Vec2::new(200.0, 28.0),
@@ -1373,14 +1678,15 @@ fn render_no_repo_welcome(ui: &mut egui::Ui, state: &mut AppState) {
 
 /// Menu `...` completo identico a VS Code Source Control.
 fn render_more_actions_menu(ui: &mut egui::Ui, state: &mut AppState) {
+    let lang = state.settings.language;
     ui.set_min_width(210.0);
 
-    ui.menu_button("View & Sort", |ui| {
+    ui.menu_button(tr(lang, "View & Sort", "Vista e Ordinamento"), |ui| {
         if ui
             .radio_value(
                 &mut state.settings.file_view_mode,
                 ScmFileViewMode::List,
-                "View as List",
+                tr(lang, "View as List", "Vista Elenco"),
             )
             .changed()
         {
@@ -1391,7 +1697,7 @@ fn render_more_actions_menu(ui: &mut egui::Ui, state: &mut AppState) {
             .radio_value(
                 &mut state.settings.file_view_mode,
                 ScmFileViewMode::Tree,
-                "View as Tree",
+                tr(lang, "View as Tree", "Vista ad Albero"),
             )
             .changed()
         {
@@ -1402,7 +1708,11 @@ fn render_more_actions_menu(ui: &mut egui::Ui, state: &mut AppState) {
         if ui
             .checkbox(
                 &mut state.settings.show_graph_section,
-                "Show Source Control Graph",
+                tr(
+                    lang,
+                    "Show Source Control Graph",
+                    "Mostra Grafo Controllo Sorgente",
+                ),
             )
             .changed()
         {
@@ -1413,28 +1723,34 @@ fn render_more_actions_menu(ui: &mut egui::Ui, state: &mut AppState) {
     ui.separator();
 
     ui.menu_button("Pull, Push", |ui| {
-        if ui.button("Sync").clicked() {
+        if ui.button(tr(lang, "Sync", "Sincronizza (Sync)")).clicked() {
             let has_up = state.status.upstream.is_some();
             let br = state.status.head_name.clone();
-            state.spawn_git_task("Syncing...", move |repo| {
+            let busy_msg = tr(lang, "Syncing...", "Sincronizzazione...");
+            let done_msg = tr(lang, "Sync completed", "Sync completato");
+            state.spawn_git_task(busy_msg, move |repo| {
                 ops::sync_repo(repo, has_up, &br)
-                    .map(|logs| ("Sync completato".into(), logs))
+                    .map(|logs| (done_msg.into(), logs))
                     .map_err(|(e, l)| (e, vec![l]))
             });
             ui.close_menu();
         }
         if ui.button("Pull").clicked() {
-            state.spawn_git_task("Pulling...", move |repo| {
+            let busy_msg = tr(lang, "Pulling...", "Pull in corso...");
+            let done_msg = tr(lang, "Pull completed", "Pull completato");
+            state.spawn_git_task(busy_msg, move |repo| {
                 ops::pull(repo, false)
-                    .map(|l| ("Pull completato".into(), vec![l]))
+                    .map(|l| (done_msg.into(), vec![l]))
                     .map_err(|(e, l)| (e, vec![l]))
             });
             ui.close_menu();
         }
         if ui.button("Pull (Rebase)").clicked() {
-            state.spawn_git_task("Pulling (Rebase)...", move |repo| {
+            let busy_msg = tr(lang, "Pulling (Rebase)...", "Pull (Rebase) in corso...");
+            let done_msg = tr(lang, "Pull (Rebase) completed", "Pull (Rebase) completato");
+            state.spawn_git_task(busy_msg, move |repo| {
                 ops::pull(repo, true)
-                    .map(|l| ("Pull (Rebase) completato".into(), vec![l]))
+                    .map(|l| (done_msg.into(), vec![l]))
                     .map_err(|(e, l)| (e, vec![l]))
             });
             ui.close_menu();
@@ -1442,27 +1758,37 @@ fn render_more_actions_menu(ui: &mut egui::Ui, state: &mut AppState) {
         if ui.button("Push").clicked() {
             let has_up = state.status.upstream.is_some();
             let br = state.status.head_name.clone();
-            state.spawn_git_task("Pushing...", move |repo| {
+            let busy_msg = tr(lang, "Pushing...", "Push in corso...");
+            let done_msg = tr(lang, "Push completed", "Push completato");
+            state.spawn_git_task(busy_msg, move |repo| {
                 let up = if has_up { None } else { Some(br.as_str()) };
                 ops::push(repo, up, false)
-                    .map(|l| ("Push completato".into(), vec![l]))
+                    .map(|l| (done_msg.into(), vec![l]))
                     .map_err(|(e, l)| (e, vec![l]))
             });
             ui.close_menu();
         }
         if ui.button("Push (Force with Lease)").clicked() {
-            state.spawn_git_task("Force Pushing...", move |repo| {
+            let busy_msg = tr(lang, "Force Pushing...", "Push forzato in corso...");
+            let done_msg = tr(
+                lang,
+                "Push (--force-with-lease) completed",
+                "Push (--force-with-lease) completato",
+            );
+            state.spawn_git_task(busy_msg, move |repo| {
                 ops::push(repo, None, true)
-                    .map(|l| ("Push (--force-with-lease) completato".into(), vec![l]))
+                    .map(|l| (done_msg.into(), vec![l]))
                     .map_err(|(e, l)| (e, vec![l]))
             });
             ui.close_menu();
         }
         ui.separator();
         if ui.button("Fetch All (Prune)").clicked() {
-            state.spawn_git_task("Fetching all remotes...", move |repo| {
+            let busy_msg = tr(lang, "Fetching all remotes...", "Fetch da tutti i remote...");
+            let done_msg = tr(lang, "Fetch completed", "Fetch completato");
+            state.spawn_git_task(busy_msg, move |repo| {
                 ops::fetch_all(repo)
-                    .map(|l| ("Fetch completato".into(), vec![l]))
+                    .map(|l| (done_msg.into(), vec![l]))
                     .map_err(|(e, l)| (e, vec![l]))
             });
             ui.close_menu();
@@ -1479,7 +1805,10 @@ fn render_more_actions_menu(ui: &mut egui::Ui, state: &mut AppState) {
             state.execute_commit(CommitVariant::Amend);
             ui.close_menu();
         }
-        if ui.button("Commit (Signed Off)").clicked() {
+        if ui
+            .button(tr(lang, "Commit (Signed Off)", "Commit (Firmato)"))
+            .clicked()
+        {
             state.execute_commit(CommitVariant::SignOff);
             ui.close_menu();
         }
@@ -1492,31 +1821,60 @@ fn render_more_actions_menu(ui: &mut egui::Ui, state: &mut AppState) {
             ui.close_menu();
         }
         ui.separator();
-        if ui.button("Undo Last Commit (soft reset)").clicked() {
-            state.spawn_git_task("Undoing last commit...", move |repo| {
+        if ui
+            .button(tr(
+                lang,
+                "Undo Last Commit (soft reset)",
+                "Annulla Ultimo Commit (soft reset)",
+            ))
+            .clicked()
+        {
+            let busy_msg = tr(
+                lang,
+                "Undoing last commit...",
+                "Annullamento ultimo commit...",
+            );
+            let done_msg = tr(
+                lang,
+                "Last commit undone (changes kept staged)",
+                "Ultimo commit annullato (modifiche mantenute in stage)",
+            );
+            state.spawn_git_task(busy_msg, move |repo| {
                 ops::undo_last_commit(repo)
-                    .map(|l| {
-                        (
-                            "Ultimo commit annullato (modifiche mantenute in stage)".into(),
-                            vec![l],
-                        )
-                    })
+                    .map(|l| (done_msg.into(), vec![l]))
                     .map_err(|(e, l)| (e, vec![l]))
             });
             ui.close_menu();
         }
     });
 
-    ui.menu_button("Changes", |ui| {
-        if ui.button("+ Stage All Changes").clicked() {
+    ui.menu_button(tr(lang, "Changes", "Modifiche"), |ui| {
+        if ui
+            .button(tr(lang, "+ Stage All Changes", "+ Aggiungi Tutto allo Stage"))
+            .clicked()
+        {
             state.stage_all();
             ui.close_menu();
         }
-        if ui.button("- Unstage All Changes").clicked() {
+        if ui
+            .button(tr(
+                lang,
+                "- Unstage All Changes",
+                "- Rimuovi Tutto dallo Stage",
+            ))
+            .clicked()
+        {
             state.unstage_all();
             ui.close_menu();
         }
-        if ui.button("Discard All Changes...").clicked() {
+        if ui
+            .button(tr(
+                lang,
+                "Discard All Changes...",
+                "Annulla Tutte le Modifiche...",
+            ))
+            .clicked()
+        {
             state.quick_pick = Some(QuickPickState::new(QuickPickKind::ConfirmDiscardAll));
             ui.close_menu();
         }
@@ -1527,23 +1885,35 @@ fn render_more_actions_menu(ui: &mut egui::Ui, state: &mut AppState) {
             state.quick_pick = Some(QuickPickState::new(QuickPickKind::Checkout));
             ui.close_menu();
         }
-        if ui.button("Create Branch...").clicked() {
+        if ui
+            .button(tr(lang, "Create Branch...", "Crea Branch..."))
+            .clicked()
+        {
             state.quick_pick = Some(QuickPickState::new(QuickPickKind::CreateBranch {
                 from_ref: None,
             }));
             ui.close_menu();
         }
-        if ui.button("Create Branch From...").clicked() {
+        if ui
+            .button(tr(lang, "Create Branch From...", "Crea Branch Da..."))
+            .clicked()
+        {
             state.quick_pick = Some(QuickPickState::new(QuickPickKind::CreateBranchFrom {
                 preset_name: None,
             }));
             ui.close_menu();
         }
-        if ui.button("Rename Branch...").clicked() {
+        if ui
+            .button(tr(lang, "Rename Branch...", "Rinomina Branch..."))
+            .clicked()
+        {
             state.quick_pick = Some(QuickPickState::new(QuickPickKind::RenameBranch));
             ui.close_menu();
         }
-        if ui.button("Delete Branch...").clicked() {
+        if ui
+            .button(tr(lang, "Delete Branch...", "Elimina Branch..."))
+            .clicked()
+        {
             state.quick_pick = Some(QuickPickState::new(QuickPickKind::DeleteBranch {
                 force: false,
             }));
@@ -1561,13 +1931,23 @@ fn render_more_actions_menu(ui: &mut egui::Ui, state: &mut AppState) {
     });
 
     ui.menu_button("Stash", |ui| {
-        if ui.button("Stash Changes...").clicked() {
+        if ui
+            .button(tr(lang, "Stash Changes...", "Salva Modifiche nello Stash..."))
+            .clicked()
+        {
             state.quick_pick = Some(QuickPickState::new(QuickPickKind::StashPush {
                 include_untracked: false,
             }));
             ui.close_menu();
         }
-        if ui.button("Stash (Include Untracked)...").clicked() {
+        if ui
+            .button(tr(
+                lang,
+                "Stash (Include Untracked)...",
+                "Stash (Includi Non Tracciati)...",
+            ))
+            .clicked()
+        {
             state.quick_pick = Some(QuickPickState::new(QuickPickKind::StashPush {
                 include_untracked: true,
             }));
@@ -1578,33 +1958,55 @@ fn render_more_actions_menu(ui: &mut egui::Ui, state: &mut AppState) {
             state.quick_pick = Some(QuickPickState::new(QuickPickKind::StashPop));
             ui.close_menu();
         }
-        if ui.button("Apply Stash...").clicked() {
+        if ui
+            .button(tr(lang, "Apply Stash...", "Applica Stash..."))
+            .clicked()
+        {
             state.quick_pick = Some(QuickPickState::new(QuickPickKind::StashApply));
             ui.close_menu();
         }
-        if ui.button("Drop Stash...").clicked() {
+        if ui
+            .button(tr(lang, "Drop Stash...", "Elimina Stash..."))
+            .clicked()
+        {
             state.quick_pick = Some(QuickPickState::new(QuickPickKind::StashDrop));
             ui.close_menu();
         }
     });
 
     ui.menu_button("Tags", |ui| {
-        if ui.button("Create Tag...").clicked() {
+        if ui
+            .button(tr(lang, "Create Tag...", "Crea Tag..."))
+            .clicked()
+        {
             state.quick_pick = Some(QuickPickState::new(QuickPickKind::CreateTag));
             ui.close_menu();
         }
-        if ui.button("Delete Tag...").clicked() {
+        if ui
+            .button(tr(lang, "Delete Tag...", "Elimina Tag..."))
+            .clicked()
+        {
             state.quick_pick = Some(QuickPickState::new(QuickPickKind::DeleteTag));
             ui.close_menu();
         }
     });
 
     ui.separator();
-    if ui.button("Command Palette... (Ctrl+Shift+P)").clicked() {
+    if ui
+        .button(tr(
+            lang,
+            "Command Palette... (Ctrl+Shift+P)",
+            "Palette Comandi... (Ctrl+Shift+P)",
+        ))
+        .clicked()
+    {
         state.quick_pick = Some(QuickPickState::new(QuickPickKind::CommandPalette));
         ui.close_menu();
     }
-    if ui.button("Show Git Output").clicked() {
+    if ui
+        .button(tr(lang, "Show Git Output", "Mostra Output Git"))
+        .clicked()
+    {
         state.settings.show_output_panel = true;
         state.settings.save();
         ui.close_menu();

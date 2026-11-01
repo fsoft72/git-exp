@@ -1,3 +1,4 @@
+use crate::i18n::tr;
 use crate::state::AppState;
 use crate::theme::{Codicon, VsCodeTheme, codicon_button};
 use egui::{RichText, Stroke};
@@ -6,6 +7,7 @@ pub fn render_output_panel(ctx: &egui::Context, state: &mut AppState) {
     if !state.settings.show_output_panel {
         return;
     }
+    let lang = state.settings.language;
 
     egui::TopBottomPanel::bottom("vscode_git_output_drawer")
         .resizable(true)
@@ -26,17 +28,17 @@ pub fn render_output_panel(ctx: &egui::Context, state: &mut AppState) {
                         .color(VsCodeTheme::TEXT_BRIGHT),
                 );
                 ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                    if codicon_button(ui, Codicon::Close, "Close Panel") {
+                    if codicon_button(ui, Codicon::Close, tr(lang, "Close Panel", "Chiudi Pannello")) {
                         state.settings.show_output_panel = false;
                         state.settings.save();
                     }
                     if ui
                         .small_button(
-                            RichText::new("Clear")
+                            RichText::new(tr(lang, "Clear", "Pulisci"))
                                 .size(11.0)
                                 .color(VsCodeTheme::TEXT_MUTED),
                         )
-                        .on_hover_text("Clear Git Output Log")
+                        .on_hover_text(tr(lang, "Clear Git Output Log", "Pulisci Log Output Git"))
                         .clicked()
                     {
                         state.git_logs.clear();

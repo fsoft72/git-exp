@@ -1,4 +1,5 @@
 mod git;
+mod i18n;
 mod settings;
 mod state;
 mod theme;

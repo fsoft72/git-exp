@@ -1,18 +1,24 @@
 use crate::git::graph::{CommitNode, CommitSyncRole, RefBadgeKind};
 use crate::git::ops;
+use crate::i18n::{Language, tr};
 use crate::state::{AppState, QuickPickKind, QuickPickState};
 use crate::theme::{Codicon, VsCodeTheme, draw_inline_codicon};
 use egui::{Color32, CornerRadius, Pos2, Rect, RichText, Sense, Stroke, Vec2};
 
 pub fn render_graph_list(ui: &mut egui::Ui, state: &mut AppState, max_rows: usize) {
+    let lang = state.settings.language;
     if state.graph_commits.is_empty() {
         ui.horizontal(|ui| {
             ui.add_space(18.0);
             ui.label(
-                RichText::new("No commits in repository yet")
-                    .size(12.0)
-                    .italics()
-                    .color(VsCodeTheme::TEXT_MUTED),
+                RichText::new(tr(
+                    lang,
+                    "No commits in repository yet",
+                    "Ancora nessun commit nel repository",
+                ))
+                .size(12.0)
+                .italics()
+                .color(VsCodeTheme::TEXT_MUTED),
             );
         });
         return;
@@ -227,10 +233,12 @@ pub fn render_graph_list(ui: &mut egui::Ui, state: &mut AppState, max_rows: usiz
         });
 
         let tooltip = format!(
-            "Commit: {}\nAuthor: {} <{}>\nDate: {} ({})\n\n{}",
+            "Commit: {}\n{}: {} <{}>\n{}: {} ({})\n\n{}",
             commit.sha,
+            tr(lang, "Author", "Autore"),
             commit.author,
             commit.author_email,
+            tr(lang, "Date", "Data"),
             commit.relative_time,
             commit.iso_date,
             commit.subject
@@ -242,14 +250,22 @@ pub fn render_graph_list(ui: &mut egui::Ui, state: &mut AppState, max_rows: usiz
 
         resp.context_menu(|ui| {
             ui.set_min_width(190.0);
-            if ui.button("Inspect Commit Details & Files").clicked() {
+            if ui
+                .button(tr(
+                    lang,
+                    "Inspect Commit Details & Files",
+                    "Ispeziona Dettagli e File del Commit",
+                ))
+                .clicked()
+            {
                 state.open_commit_inspector(&commit.sha);
                 ui.close_menu();
             }
-            if ui
-                .button(format!("Create Branch from {}...", commit.short_sha))
-                .clicked()
-            {
+            let create_br_lbl = match lang {
+                Language::En => format!("Create Branch from {}...", commit.short_sha),
+                Language::It => format!("Crea Branch da {}...", commit.short_sha),
+            };
+            if ui.button(create_br_lbl).clicked() {
                 state.quick_pick = Some(QuickPickState::new(QuickPickKind::CreateBranch {
                     from_ref: Some(commit.sha.clone()),
                 }));
@@ -260,24 +276,37 @@ pub fn render_graph_list(ui: &mut egui::Ui, state: &mut AppState, max_rows: usiz
                 .clicked()
             {
                 let sha = commit.sha.clone();
-                state.spawn_git_task("Checking out commit...", move |repo| {
+                let busy_msg = tr(lang, "Checking out commit...", "Checkout del commit...");
+                state.spawn_git_task(busy_msg, move |repo| {
                     ops::checkout_branch(repo, &sha, false)
                         .map(|l| {
-                            (
-                                format!("HEAD detached at {}", &sha[..7.min(sha.len())]),
-                                vec![l],
-                            )
+                            let short = &sha[..7.min(sha.len())];
+                            let msg = match lang {
+                                Language::En => format!("HEAD detached at {}", short),
+                                Language::It => format!("HEAD scollegato a {}", short),
+                            };
+                            (msg, vec![l])
                         })
                         .map_err(|(e, l)| (e, vec![l]))
                 });
                 ui.close_menu();
             }
             ui.separator();
-            if ui.button("Copy Commit Hash (SHA)").clicked() {
+            if ui
+                .button(tr(
+                    lang,
+                    "Copy Commit Hash (SHA)",
+                    "Copia Hash del Commit (SHA)",
+                ))
+                .clicked()
+            {
                 ui.ctx().copy_text(commit.sha.clone());
                 ui.close_menu();
             }
-            if ui.button("Copy Commit Subject").clicked() {
+            if ui
+                .button(tr(lang, "Copy Commit Subject", "Copia Oggetto del Commit"))
+                .clicked()
+            {
                 ui.ctx().copy_text(commit.subject.clone());
                 ui.close_menu();
             }

@@ -1,10 +1,12 @@
 use crate::git::ops;
+use crate::i18n::{Language, tr};
 use crate::state::{AppState, QuickPickKind, QuickPickState};
 use crate::theme::{Codicon, VsCodeTheme, codicon_text_button, draw_inline_codicon};
 use egui::{Color32, CornerRadius, RichText, Stroke, Vec2};
 use std::time::Duration;
 
 pub fn render_status_bar(ctx: &egui::Context, state: &mut AppState) {
+    let lang = state.settings.language;
     egui::TopBottomPanel::bottom("vscode_status_bar")
         .exact_height(24.0)
         .frame(
@@ -34,9 +36,11 @@ pub fn render_status_bar(ctx: &egui::Context, state: &mut AppState) {
                         Vec2::new(0.0, 20.0),
                         CornerRadius::same(2),
                     )
-                    .on_hover_text(
+                    .on_hover_text(tr(
+                        lang,
                         "Git Branch - Click to Checkout / Create Branch (Git: Checkout to...)",
-                    )
+                        "Branch Git - Clicca per Checkout / Crea Branch (Git: Checkout to...)",
+                    ))
                     .clicked()
                     {
                         state.quick_pick = Some(QuickPickState::new(QuickPickKind::Checkout));
@@ -57,13 +61,19 @@ pub fn render_status_bar(ctx: &egui::Context, state: &mut AppState) {
                             Vec2::new(0.0, 20.0),
                             CornerRadius::same(2),
                         )
-                        .on_hover_text("Synchronize Changes (Pull & Push)")
+                        .on_hover_text(tr(
+                            lang,
+                            "Synchronize Changes (Pull & Push)",
+                            "Sincronizza Modifiche (Pull & Push)",
+                        ))
                         .clicked()
                         {
                             let br = state.status.head_name.clone();
-                            state.spawn_git_task("Syncing...", move |repo| {
+                            let busy_msg = tr(lang, "Syncing...", "Sincronizzazione...");
+                            let done_msg = tr(lang, "Sync completed", "Sync completato");
+                            state.spawn_git_task(busy_msg, move |repo| {
                                 ops::sync_repo(repo, true, &br)
-                                    .map(|logs| ("Sync completato".into(), logs))
+                                    .map(|logs| (done_msg.into(), logs))
                                     .map_err(|(e, l)| (e, vec![l]))
                             });
                         }
@@ -71,35 +81,48 @@ pub fn render_status_bar(ctx: &egui::Context, state: &mut AppState) {
                         if codicon_text_button(
                             ui,
                             Codicon::CloudUpload,
-                            "Publish Branch",
+                            tr(lang, "Publish Branch", "Pubblica Branch"),
                             Color32::TRANSPARENT,
                             VsCodeTheme::TEXT_PRIMARY,
                             Vec2::new(0.0, 20.0),
                             CornerRadius::same(2),
                         )
-                        .on_hover_text("Publish Branch to Remote")
+                        .on_hover_text(tr(
+                            lang,
+                            "Publish Branch to Remote",
+                            "Pubblica Branch sul Remote",
+                        ))
                         .clicked()
                         {
                             let br = state.status.head_name.clone();
-                            state.spawn_git_task("Publishing branch...", move |repo| {
+                            let busy_msg =
+                                tr(lang, "Publishing branch...", "Pubblicazione branch...");
+                            state.spawn_git_task(busy_msg, move |repo| {
                                 ops::push(repo, Some(&br), false)
-                                    .map(|l| (format!("Pubblicato '{}'", br), vec![l]))
+                                    .map(|l| {
+                                        let msg = match lang {
+                                            Language::En => format!("Published '{}'", br),
+                                            Language::It => format!("Pubblicato '{}'", br),
+                                        };
+                                        (msg, vec![l])
+                                    })
                                     .map_err(|(e, l)| (e, vec![l]))
                             });
                         }
                     }
                 } else {
                     ui.label(
-                        RichText::new("No Repository Open")
+                        RichText::new(tr(lang, "No Repository Open", "Nessun Repository Aperto"))
                             .size(11.5)
                             .color(VsCodeTheme::TEXT_MUTED),
                     );
                 }
 
                 // 3. Indicatore operazione in corso (rispetta il flag silent per Refreshing Git status...)
-                let show_busy = state.is_busy
-                    && (state.busy_label != "Refreshing Git status..."
-                        || state.settings.show_refresh_status_message);
+                let is_refresh_msg = state.busy_label == "Refreshing Git status..."
+                    || state.busy_label == "Aggiornamento stato Git...";
+                let show_busy =
+                    state.is_busy && (!is_refresh_msg || state.settings.show_refresh_status_message);
                 if show_busy {
                     ui.spinner();
                     ui.label(
@@ -133,7 +156,11 @@ pub fn render_status_bar(ctx: &egui::Context, state: &mut AppState) {
                         Vec2::new(0.0, 20.0),
                         CornerRadius::same(2),
                     )
-                    .on_hover_text(format!("{}\n\nClick to dismiss", err))
+                    .on_hover_text(format!(
+                        "{}\n\n{}",
+                        err,
+                        tr(lang, "Click to dismiss", "Clicca per chiudere")
+                    ))
                     .clicked()
                     {
                         state.last_error = None;
@@ -157,7 +184,11 @@ pub fn render_status_bar(ctx: &egui::Context, state: &mut AppState) {
                             )
                             .frame(false),
                         )
-                        .on_hover_text("Toggle Git Output Panel")
+                        .on_hover_text(tr(
+                            lang,
+                            "Toggle Git Output Panel",
+                            "Mostra/Nascondi Pannello Output Git",
+                        ))
                         .clicked()
                     {
                         state.settings.show_output_panel = !state.settings.show_output_panel;
@@ -168,13 +199,21 @@ pub fn render_status_bar(ctx: &egui::Context, state: &mut AppState) {
                         if codicon_text_button(
                             ui,
                             Codicon::Archive,
-                            &format!("Stashes: {}", state.status.stashes.len()),
+                            &format!(
+                                "{}: {}",
+                                tr(lang, "Stashes", "Stash"),
+                                state.status.stashes.len()
+                            ),
                             Color32::TRANSPARENT,
                             VsCodeTheme::TEXT_MUTED,
                             Vec2::new(0.0, 20.0),
                             CornerRadius::same(2),
                         )
-                        .on_hover_text("Click to Pop Stash")
+                        .on_hover_text(tr(
+                            lang,
+                            "Click to Pop Stash",
+                            "Clicca per applicare (Pop) lo Stash",
+                        ))
                         .clicked()
                         {
                             state.quick_pick = Some(QuickPickState::new(QuickPickKind::StashPop));
