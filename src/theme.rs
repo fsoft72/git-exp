@@ -10,37 +10,39 @@ pub struct VsCodeTheme;
 impl VsCodeTheme {
     // --- Superfici principali ---
     pub const ACTIVITY_BAR_BG: Color32 = Color32::from_rgb(0x18, 0x18, 0x18);
-    pub const SIDEBAR_BG: Color32 = Color32::from_rgb(0x18, 0x18, 0x18);
-    pub const SIDEBAR_HEADER_BG: Color32 = Color32::from_rgb(0x18, 0x18, 0x18);
-    pub const EDITOR_BG: Color32 = Color32::from_rgb(0x1F, 0x1F, 0x1F);
+    pub const SIDEBAR_BG: Color32 = Color32::from_rgb(0x1E, 0x1E, 0x1E);
+    pub const SIDEBAR_HEADER_BG: Color32 = Color32::from_rgb(0x1E, 0x1E, 0x1E);
+    pub const EDITOR_BG: Color32 = Color32::from_rgb(0x22, 0x22, 0x22);
     pub const EDITOR_TAB_BAR_BG: Color32 = Color32::from_rgb(0x18, 0x18, 0x18);
-    pub const EDITOR_TAB_ACTIVE_BG: Color32 = Color32::from_rgb(0x1F, 0x1F, 0x1F);
+    pub const EDITOR_TAB_ACTIVE_BG: Color32 = Color32::from_rgb(0x22, 0x22, 0x22);
     pub const EDITOR_TAB_INACTIVE_BG: Color32 = Color32::from_rgb(0x18, 0x18, 0x18);
     pub const STATUS_BAR_BG: Color32 = Color32::from_rgb(0x18, 0x18, 0x18);
     pub const QUICK_PICK_BG: Color32 = Color32::from_rgb(0x25, 0x25, 0x26);
 
     // --- Bordi e separatori ---
-    pub const BORDER: Color32 = Color32::from_rgb(0x2B, 0x2B, 0x2B);
+    pub const BORDER: Color32 = Color32::from_rgb(0x33, 0x33, 0x37);
     pub const FOCUS_BORDER: Color32 = Color32::from_rgb(0x00, 0x78, 0xD4);
-    pub const INPUT_BG: Color32 = Color32::from_rgb(0x31, 0x31, 0x31);
-    pub const INPUT_BORDER: Color32 = Color32::from_rgb(0x3C, 0x3C, 0x3C);
+    pub const INPUT_BG: Color32 = Color32::from_rgb(0x2D, 0x2D, 0x30);
+    pub const INPUT_BORDER: Color32 = Color32::from_rgb(0x55, 0x55, 0x5C);
+    pub const WIDGET_BG: Color32 = Color32::from_rgb(0x3A, 0x3A, 0x40);
+    pub const WIDGET_BORDER: Color32 = Color32::from_rgb(0x7A, 0x7A, 0x85);
 
     // --- Selezione e Hover nelle liste ---
-    pub const LIST_HOVER_BG: Color32 = Color32::from_rgb(0x2A, 0x2D, 0x2E);
-    pub const LIST_ACTIVE_SELECTION_BG: Color32 = Color32::from_rgb(0x04, 0x39, 0x5E);
+    pub const LIST_HOVER_BG: Color32 = Color32::from_rgb(0x2E, 0x31, 0x33);
+    pub const LIST_ACTIVE_SELECTION_BG: Color32 = Color32::from_rgb(0x09, 0x47, 0x71);
     pub const LIST_INACTIVE_SELECTION_BG: Color32 = Color32::from_rgb(0x37, 0x37, 0x3D);
 
     // --- Bottoni primari (Commit / Sync) ---
     pub const ACCENT_BLUE: Color32 = Color32::from_rgb(0x00, 0x78, 0xD4);
-    pub const ACCENT_BLUE_HOVER: Color32 = Color32::from_rgb(0x02, 0x6E, 0xC1);
+    pub const ACCENT_BLUE_HOVER: Color32 = Color32::from_rgb(0x10, 0x84, 0xDF);
     pub const BADGE_BG: Color32 = Color32::from_rgb(0x4D, 0x4D, 0x4D);
     pub const ACTIVITY_BADGE_BG: Color32 = Color32::from_rgb(0x00, 0x78, 0xD4);
 
     // --- Testo ---
-    pub const TEXT_PRIMARY: Color32 = Color32::from_rgb(0xCC, 0xCC, 0xCC);
+    pub const TEXT_PRIMARY: Color32 = Color32::from_rgb(0xD4, 0xD4, 0xD4);
     pub const TEXT_BRIGHT: Color32 = Color32::from_rgb(0xFF, 0xFF, 0xFF);
-    pub const TEXT_MUTED: Color32 = Color32::from_rgb(0x85, 0x85, 0x85);
-    pub const TEXT_DIM: Color32 = Color32::from_rgb(0x6E, 0x6E, 0x6E);
+    pub const TEXT_MUTED: Color32 = Color32::from_rgb(0x9E, 0x9E, 0x9E);
+    pub const TEXT_DIM: Color32 = Color32::from_rgb(0x80, 0x80, 0x80);
 
     // --- Colori Git ufficiali di VS Code (gitDecoration.*) ---
     pub const GIT_MODIFIED: Color32 = Color32::from_rgb(0xE2, 0xC0, 0x8D);
@@ -85,32 +87,41 @@ impl VsCodeTheme {
 
         visuals.window_stroke = Stroke::new(1.0_f32, Self::BORDER);
         visuals.window_corner_radius = CornerRadius::same(4);
+        visuals.slider_trailing_fill = true;
 
-        visuals.selection.bg_fill = Self::LIST_ACTIVE_SELECTION_BG;
-        visuals.selection.stroke = Stroke::new(1.0_f32, Self::FOCUS_BORDER);
+        visuals.selection.bg_fill = Self::ACCENT_BLUE;
+        visuals.selection.stroke = Stroke::new(1.5_f32, Self::TEXT_BRIGHT);
 
         visuals.widgets.noninteractive.bg_fill = Self::SIDEBAR_BG;
+        visuals.widgets.noninteractive.weak_bg_fill = Self::SIDEBAR_BG;
         visuals.widgets.noninteractive.fg_stroke = Stroke::new(1.0_f32, Self::TEXT_PRIMARY);
         visuals.widgets.noninteractive.bg_stroke = Stroke::new(1.0_f32, Self::BORDER);
         visuals.widgets.noninteractive.corner_radius = CornerRadius::same(3);
 
-        visuals.widgets.inactive.bg_fill = Color32::TRANSPARENT;
-        visuals.widgets.inactive.weak_bg_fill = Color32::TRANSPARENT;
-        visuals.widgets.inactive.fg_stroke = Stroke::new(1.0_f32, Self::TEXT_PRIMARY);
-        visuals.widgets.inactive.bg_stroke = Stroke::NONE;
+        // Controlli interattivi a riposo (Checkbox, RadioButton, Slider rail/knob, DragValue)
+        visuals.widgets.inactive.bg_fill = Self::WIDGET_BG;
+        visuals.widgets.inactive.weak_bg_fill = Self::INPUT_BG;
+        visuals.widgets.inactive.fg_stroke = Stroke::new(1.5_f32, Self::TEXT_BRIGHT);
+        visuals.widgets.inactive.bg_stroke = Stroke::new(1.2_f32, Self::WIDGET_BORDER);
         visuals.widgets.inactive.corner_radius = CornerRadius::same(3);
 
-        visuals.widgets.hovered.bg_fill = Self::LIST_HOVER_BG;
+        visuals.widgets.hovered.bg_fill = Color32::from_rgb(0x48, 0x48, 0x50);
         visuals.widgets.hovered.weak_bg_fill = Self::LIST_HOVER_BG;
-        visuals.widgets.hovered.fg_stroke = Stroke::new(1.0_f32, Self::TEXT_BRIGHT);
-        visuals.widgets.hovered.bg_stroke = Stroke::NONE;
+        visuals.widgets.hovered.fg_stroke = Stroke::new(1.8_f32, Self::TEXT_BRIGHT);
+        visuals.widgets.hovered.bg_stroke = Stroke::new(1.3_f32, Self::FOCUS_BORDER);
         visuals.widgets.hovered.corner_radius = CornerRadius::same(3);
 
-        visuals.widgets.active.bg_fill = Self::LIST_ACTIVE_SELECTION_BG;
+        visuals.widgets.active.bg_fill = Self::ACCENT_BLUE;
         visuals.widgets.active.weak_bg_fill = Self::LIST_ACTIVE_SELECTION_BG;
-        visuals.widgets.active.fg_stroke = Stroke::new(1.0_f32, Self::TEXT_BRIGHT);
-        visuals.widgets.active.bg_stroke = Stroke::new(1.0_f32, Self::FOCUS_BORDER);
+        visuals.widgets.active.fg_stroke = Stroke::new(2.0_f32, Self::TEXT_BRIGHT);
+        visuals.widgets.active.bg_stroke = Stroke::new(1.5_f32, Self::FOCUS_BORDER);
         visuals.widgets.active.corner_radius = CornerRadius::same(3);
+
+        visuals.widgets.open.bg_fill = Self::WIDGET_BG;
+        visuals.widgets.open.weak_bg_fill = Self::LIST_HOVER_BG;
+        visuals.widgets.open.fg_stroke = Stroke::new(1.5_f32, Self::TEXT_BRIGHT);
+        visuals.widgets.open.bg_stroke = Stroke::new(1.2_f32, Self::FOCUS_BORDER);
+        visuals.widgets.open.corner_radius = CornerRadius::same(3);
 
         let mut style = Style {
             visuals,
@@ -121,6 +132,7 @@ impl VsCodeTheme {
         style.spacing.window_margin = egui::Margin::same(8);
         style.spacing.button_padding = egui::vec2(6.0, 3.0);
         style.spacing.indent = 14.0;
+        style.spacing.slider_width = 160.0;
         style.spacing.scroll = egui::style::ScrollStyle::solid();
         style.spacing.scroll.bar_width = 8.0;
 

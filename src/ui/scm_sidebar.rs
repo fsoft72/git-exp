@@ -76,6 +76,7 @@ fn render_source_control_panel(ui: &mut egui::Ui, state: &mut AppState) {
                 &more_resp,
                 egui::PopupCloseBehavior::CloseOnClickOutside,
                 |ui| {
+                    ui.visuals_mut().button_frame = false;
                     render_more_actions_menu(ui, state);
                 },
             );
@@ -226,8 +227,8 @@ fn render_commit_box_area(ui: &mut egui::Ui, state: &mut AppState) {
                             .checkbox(
                                 &mut amend,
                                 RichText::new("Amend")
-                                    .size(11.0)
-                                    .color(VsCodeTheme::TEXT_MUTED),
+                                    .size(11.5)
+                                    .color(VsCodeTheme::TEXT_PRIMARY),
                             )
                             .on_hover_text("Amend previous commit (git commit --amend)")
                             .changed()
@@ -336,6 +337,7 @@ fn render_commit_box_area(ui: &mut egui::Ui, state: &mut AppState) {
                     &dd_resp,
                     egui::PopupCloseBehavior::CloseOnClick,
                     |ui| {
+                        ui.visuals_mut().button_frame = false;
                         ui.set_min_width(185.0);
                         if ui.button("Commit").clicked() {
                             state.commit_action_variant = CommitVariant::Normal;
@@ -1180,12 +1182,18 @@ fn render_settings_sidebar(ui: &mut egui::Ui, state: &mut AppState) {
                         }
                     });
 
-                    ui.add_space(4.0);
+                    ui.add_space(6.0);
+                    ui.spacing_mut().slider_width = (card_w - 50.0).max(140.0);
                     let mut slider_secs = state.settings.refresh_interval_secs;
                     if ui
                         .add(
                             egui::Slider::new(&mut slider_secs, 0..=60)
-                                .text("sec")
+                                .text(
+                                    RichText::new("sec")
+                                        .size(11.5)
+                                        .color(VsCodeTheme::TEXT_PRIMARY),
+                                )
+                                .trailing_fill(true)
                                 .show_value(false),
                         )
                         .changed()
