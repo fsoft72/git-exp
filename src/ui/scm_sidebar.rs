@@ -24,6 +24,7 @@ pub fn render_sidebar(ctx: &egui::Context, state: &mut AppState) {
             ActiveSidebarPanel::SourceControl => render_source_control_panel(ui, state),
             ActiveSidebarPanel::GraphFull => render_full_graph_sidebar(ui, state),
             ActiveSidebarPanel::Repositories => render_repositories_sidebar(ui, ctx, state),
+            ActiveSidebarPanel::Settings => render_settings_sidebar(ui, state),
         });
 }
 
@@ -42,18 +43,42 @@ fn render_source_control_panel(ui: &mut egui::Ui, state: &mut AppState) {
         ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
             ui.add_space(6.0);
 
-            // Menu `...` (More Actions)
-            egui::menu::menu_button(
+            // Menu `...` (More Actions) con icona vettoriale Codicon::MoreHorizontal
+            let more_id = ui.make_persistent_id("scm_more_actions_popup");
+            let (more_rect, more_resp) =
+                ui.allocate_exact_size(Vec2::new(20.0, 20.0), Sense::click());
+            if ui.is_rect_visible(more_rect) {
+                if more_resp.hovered() {
+                    ui.painter().rect_filled(
+                        more_rect,
+                        CornerRadius::same(3),
+                        VsCodeTheme::LIST_HOVER_BG,
+                    );
+                }
+                paint_codicon(
+                    ui.painter(),
+                    more_rect,
+                    Codicon::MoreHorizontal,
+                    if more_resp.hovered() {
+                        VsCodeTheme::TEXT_BRIGHT
+                    } else {
+                        VsCodeTheme::TEXT_PRIMARY
+                    },
+                );
+            }
+            let more_resp = more_resp.on_hover_text("Views and More Actions...");
+            if more_resp.clicked() {
+                ui.memory_mut(|m| m.toggle_popup(more_id));
+            }
+            egui::popup::popup_below_widget(
                 ui,
-                RichText::new("•••")
-                    .size(11.5)
-                    .color(VsCodeTheme::TEXT_PRIMARY),
+                more_id,
+                &more_resp,
+                egui::PopupCloseBehavior::CloseOnClickOutside,
                 |ui| {
                     render_more_actions_menu(ui, state);
                 },
-            )
-            .response
-            .on_hover_text("Views and More Actions...");
+            );
 
             // Refresh button
             if codicon_button(ui, Codicon::Refresh, "Refresh (Git Status)") {
@@ -301,7 +326,8 @@ fn render_commit_box_area(ui: &mut egui::Ui, state: &mut AppState) {
                         Color32::WHITE,
                     );
                 }
-                if dd_resp.on_hover_text("More Commit Actions...").clicked() {
+                let dd_resp = dd_resp.on_hover_text("More Commit Actions...");
+                if dd_resp.clicked() {
                     ui.memory_mut(|m| m.toggle_popup(dd_id));
                 }
                 egui::popup::popup_below_widget(
@@ -744,7 +770,11 @@ fn render_tree_node_recursive(
         draw_inline_codicon(&mut row_ui, chevron, 15.0, VsCodeTheme::TEXT_PRIMARY);
         draw_inline_codicon(
             &mut row_ui,
-            Codicon::Folder,
+            if is_collapsed {
+                Codicon::Folder
+            } else {
+                Codicon::FolderOpened
+            },
             15.0,
             Color32::from_rgb(0xDC, 0xB6, 0x7A),
         );
@@ -1040,6 +1070,168 @@ fn render_repositories_sidebar(ui: &mut egui::Ui, ctx: &egui::Context, state: &m
             }
         }
     });
+}
+
+fn render_settings_sidebar(ui: &mut egui::Ui, state: &mut AppState) {
+    ui.add_space(6.0);
+    ui.horizontal(|ui| {
+        ui.add_space(10.0);
+        ui.label(
+            RichText::new("SETTINGS - GIT CONFIGURATION")
+                .size(11.0)
+                .strong()
+                .color(VsCodeTheme::TEXT_PRIMARY),
+        );
+    });
+    ui.add_space(6.0);
+    ui.separator();
+
+    egui::ScrollArea::vertical()
+        .id_salt("settings_sidebar_scroll")
+        .auto_shrink([false, false])
+        .show(ui, |ui| {
+            ui.add_space(10.0);
+            ui.horizontal(|ui| {
+                ui.add_space(10.0);
+                ui.vertical(|ui| {
+                    let card_w = (ui.available_width() - 10.0).max(160.0);
+                    ui.set_width(card_w);
+
+                    // Sezione 1: Git Status Refresh
+                    ui.label(
+                        RichText::new("Git: Auto Refresh Status")
+                            .size(12.5)
+                            .strong()
+                            .color(VsCodeTheme::TEXT_BRIGHT),
+                    );
+                    ui.add_space(4.0);
+                    ui.label(
+                        RichText::new(
+                            " Tempo di 'Refresh git status' automatico (in secondi).\n Imposta 0 per disabilitare il polling a tempo.",
+                        )
+                        .size(11.5)
+                        .color(VsCodeTheme::TEXT_MUTED),
+                    );
+                    ui.add_space(6.0);
+
+                    ui.horizontal(|ui| {
+                        ui.label(
+                            RichText::new("Intervallo (secondi):")
+                                .size(12.0)
+                                .color(VsCodeTheme::TEXT_PRIMARY),
+                        );
+                        let mut secs = state.settings.refresh_interval_secs;
+                        let drag = egui::DragValue::new(&mut secs)
+                            .range(0..=3600)
+                            .speed(1.0)
+                            .suffix(" s");
+                        if ui.add(drag).changed() {
+                            state.settings.refresh_interval_secs = secs;
+                            state.settings.save();
+                        }
+                    });
+
+                    ui.add_space(4.0);
+                    let mut slider_secs = state.settings.refresh_interval_secs;
+                    if ui
+                        .add(
+                            egui::Slider::new(&mut slider_secs, 0..=60)
+                                .text("sec")
+                                .show_value(false),
+                        )
+                        .changed()
+                    {
+                        state.settings.refresh_interval_secs = slider_secs;
+                        state.settings.save();
+                    }
+
+                    ui.add_space(14.0);
+                    ui.separator();
+                    ui.add_space(10.0);
+
+                    // Sezione 2: Messaggio Status Bar vs Silent
+                    ui.label(
+                        RichText::new("Git: Refresh Status Bar Notification")
+                            .size(12.5)
+                            .strong()
+                            .color(VsCodeTheme::TEXT_BRIGHT),
+                    );
+                    ui.add_space(6.0);
+
+                    let mut show_msg = state.settings.show_refresh_status_message;
+                    if ui
+                        .checkbox(
+                            &mut show_msg,
+                            RichText::new("Show 'Refreshing Git status...' in Status Bar")
+                                .size(12.0)
+                                .color(VsCodeTheme::TEXT_PRIMARY),
+                        )
+                        .changed()
+                    {
+                        state.settings.show_refresh_status_message = show_msg;
+                        if !show_msg && state.busy_label == "Refreshing Git status..." {
+                            state.is_busy = false;
+                            state.busy_label.clear();
+                        }
+                        state.settings.save();
+                    }
+
+                    let mode_desc = if state.settings.show_refresh_status_message {
+                        "Stato attuale: VISIBILE (mostra spinner e messaggio nella Status Bar)"
+                    } else {
+                        "Stato attuale: SILENT (aggiorna in background senza messaggi nella Status Bar)"
+                    };
+                    ui.add_space(2.0);
+                    ui.label(
+                        RichText::new(mode_desc)
+                            .size(11.0)
+                            .italics()
+                            .color(if state.settings.show_refresh_status_message {
+                                VsCodeTheme::ACCENT_BLUE
+                            } else {
+                                VsCodeTheme::TEXT_MUTED
+                            }),
+                    );
+
+                    ui.add_space(14.0);
+                    ui.separator();
+                    ui.add_space(10.0);
+
+                    // Sezione 3: Altre preferenze UI
+                    ui.label(
+                        RichText::new("Git: View & Commit Preferences")
+                            .size(12.5)
+                            .strong()
+                            .color(VsCodeTheme::TEXT_BRIGHT),
+                    );
+                    ui.add_space(6.0);
+
+                    if ui
+                        .checkbox(
+                            &mut state.settings.show_graph_section,
+                            RichText::new("Show Source Control Graph in Sidebar")
+                                .size(12.0)
+                                .color(VsCodeTheme::TEXT_PRIMARY),
+                        )
+                        .changed()
+                    {
+                        state.settings.save();
+                    }
+
+                    if ui
+                        .checkbox(
+                            &mut state.settings.commit_signoff,
+                            RichText::new("Always Sign Off Commits (--signoff)")
+                                .size(12.0)
+                                .color(VsCodeTheme::TEXT_PRIMARY),
+                        )
+                        .changed()
+                    {
+                        state.settings.save();
+                    }
+                });
+            });
+        });
 }
 
 fn render_no_repo_welcome(ui: &mut egui::Ui, state: &mut AppState) {

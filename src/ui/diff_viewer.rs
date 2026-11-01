@@ -2,7 +2,7 @@ use crate::git::diff::{DiffHunk, DiffLineKind, DiffTarget, FileDiff};
 use crate::git::graph::CommitDetails;
 use crate::settings::DiffViewMode;
 use crate::state::{AppState, CenterTab, QuickPickKind, QuickPickState};
-use crate::theme::{VsCodeTheme, icon_action_button};
+use crate::theme::{Codicon, VsCodeTheme, codicon_button, codicon_text_button};
 use egui::{
     Color32, CornerRadius, FontFamily, FontId, Pos2, Rect, RichText, Sense, Stroke, Vec2,
     text::LayoutJob,
@@ -24,7 +24,9 @@ pub fn render_center_panel(ctx: &egui::Context, state: &mut AppState) {
             if let Some(active_tab) = state.open_tabs.get(state.active_tab_idx).cloned() {
                 match active_tab {
                     CenterTab::Diff(diff) => render_diff_tab(ui, state, &diff),
-                    CenterTab::CommitView(details) => render_commit_inspector_tab(ui, state, &details),
+                    CenterTab::CommitView(details) => {
+                        render_commit_inspector_tab(ui, state, &details)
+                    }
                     CenterTab::FileEditor { path, .. } => {
                         let idx = state.active_tab_idx;
                         render_file_editor_tab(ui, state, idx, &path);
@@ -77,7 +79,7 @@ fn render_editor_tab_bar(ui: &mut egui::Ui, state: &mut AppState) {
                                 Stroke::new(1.0_f32, VsCodeTheme::BORDER),
                             );
 
-                            // Linea superiore blu di tab attivo (stile VS Code Dark Modern)
+                            // Linea superiore blu di tab attivo
                             if is_active {
                                 let top_bar = Rect::from_min_max(
                                     rect.min,
@@ -113,17 +115,11 @@ fn render_editor_tab_bar(ui: &mut egui::Ui, state: &mut AppState) {
                                 |ui| {
                                     ui.add_space(6.0);
                                     if (is_active || hovered)
-                                        && ui
-                                            .add(
-                                                egui::Button::new(
-                                                    RichText::new("×")
-                                                        .size(14.0)
-                                                        .color(VsCodeTheme::TEXT_PRIMARY),
-                                                )
-                                                .frame(false),
-                                            )
-                                            .on_hover_text("Close (Middle-Click)")
-                                            .clicked()
+                                        && codicon_button(
+                                            ui,
+                                            Codicon::Close,
+                                            "Close Tab (Middle-Click)",
+                                        )
                                     {
                                         close_clicked = true;
                                     }
@@ -158,7 +154,7 @@ fn render_diff_tab(ui: &mut egui::Ui, state: &mut AppState, diff: &FileDiff) {
         .show(ui, |ui| {
             ui.horizontal(|ui| {
                 // Percorso breadcrumb stile VS Code
-                let breadcrumb = diff.target.path().replace('/', " › ");
+                let breadcrumb = diff.target.path().replace('/', " > ");
                 ui.label(
                     RichText::new(breadcrumb)
                         .size(12.0)
@@ -181,20 +177,42 @@ fn render_diff_tab(ui: &mut egui::Ui, state: &mut AppState, diff: &FileDiff) {
 
                 // Controlli a destra nella toolbar del Diff Editor
                 ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                    // Toggle Side-by-Side / Inline
+                    // Toggle Side-by-Side / Inline con icone vettoriali Codicon
                     let is_sbs = state.settings.diff_view_mode == DiffViewMode::SideBySide;
-                    if ui
-                        .selectable_label(!is_sbs, RichText::new("▤ Inline").size(11.5))
-                        .on_hover_text("Inline Diff View")
-                        .clicked()
+                    if codicon_text_button(
+                        ui,
+                        Codicon::DiffInline,
+                        "Inline",
+                        if !is_sbs {
+                            VsCodeTheme::LIST_ACTIVE_SELECTION_BG
+                        } else {
+                            Color32::TRANSPARENT
+                        },
+                        VsCodeTheme::TEXT_PRIMARY,
+                        Vec2::new(62.0, 20.0),
+                        CornerRadius::same(3),
+                    )
+                    .on_hover_text("Inline Diff View")
+                    .clicked()
                     {
                         state.settings.diff_view_mode = DiffViewMode::Inline;
                         state.settings.save();
                     }
-                    if ui
-                        .selectable_label(is_sbs, RichText::new("◫ Side-by-Side").size(11.5))
-                        .on_hover_text("Side-by-Side Diff View")
-                        .clicked()
+                    if codicon_text_button(
+                        ui,
+                        Codicon::SplitHorizontal,
+                        "Side-by-Side",
+                        if is_sbs {
+                            VsCodeTheme::LIST_ACTIVE_SELECTION_BG
+                        } else {
+                            Color32::TRANSPARENT
+                        },
+                        VsCodeTheme::TEXT_PRIMARY,
+                        Vec2::new(98.0, 20.0),
+                        CornerRadius::same(3),
+                    )
+                    .on_hover_text("Side-by-Side Diff View")
+                    .clicked()
                     {
                         state.settings.diff_view_mode = DiffViewMode::SideBySide;
                         state.settings.save();
@@ -202,21 +220,23 @@ fn render_diff_tab(ui: &mut egui::Ui, state: &mut AppState, diff: &FileDiff) {
 
                     ui.separator();
 
-                    // Azioni sull'intero file
+                    // Azioni sull'intero file con icone vettoriali Codicon
                     let path_str = diff.target.path().to_string();
-                    if icon_action_button(ui, "📄", "Open File in Editor") {
+                    if codicon_button(ui, Codicon::OpenFile, "Open File in Editor") {
                         state.open_file_in_editor(&path_str);
                     }
-                    if diff.target.can_stage() && icon_action_button(ui, "+", "Stage Entire File") {
+                    if diff.target.can_stage()
+                        && codicon_button(ui, Codicon::Plus, "Stage Entire File")
+                    {
                         state.stage_file(path_str.clone());
                     }
                     if diff.target.can_unstage()
-                        && icon_action_button(ui, "−", "Unstage Entire File")
+                        && codicon_button(ui, Codicon::Minus, "Unstage Entire File")
                     {
                         state.unstage_file(path_str.clone());
                     }
                     if diff.target.can_revert()
-                        && icon_action_button(ui, "↶", "Discard All Changes in File")
+                        && codicon_button(ui, Codicon::Discard, "Discard All Changes in File")
                     {
                         if let DiffTarget::WorkingTree { path, kind } = &diff.target {
                             state.quick_pick = Some(QuickPickState::new(
@@ -232,11 +252,13 @@ fn render_diff_tab(ui: &mut egui::Ui, state: &mut AppState, diff: &FileDiff) {
 
                     // Navigazione Hunk: Next / Previous Change
                     let hunk_cnt = diff.hunks.len();
-                    if icon_action_button(ui, "↓", "Next Change (F7)") && hunk_cnt > 0 {
+                    if codicon_button(ui, Codicon::ArrowDown, "Next Change (F7)") && hunk_cnt > 0 {
                         state.current_hunk_cursor = (state.current_hunk_cursor + 1) % hunk_cnt;
                         state.scroll_to_hunk = Some(state.current_hunk_cursor);
                     }
-                    if icon_action_button(ui, "↑", "Previous Change (Shift+F7)") && hunk_cnt > 0 {
+                    if codicon_button(ui, Codicon::ArrowUp, "Previous Change (Shift+F7)")
+                        && hunk_cnt > 0
+                    {
                         state.current_hunk_cursor = if state.current_hunk_cursor == 0 {
                             hunk_cnt - 1
                         } else {
@@ -262,7 +284,7 @@ fn render_diff_tab(ui: &mut egui::Ui, state: &mut AppState, diff: &FileDiff) {
     if diff.is_binary {
         ui.centered_and_justified(|ui| {
             ui.label(
-                RichText::new("Binary file modified — cannot display text diff.")
+                RichText::new("Binary file modified - cannot display text diff.")
                     .size(13.0)
                     .color(VsCodeTheme::TEXT_MUTED),
             );
@@ -289,7 +311,7 @@ fn render_diff_tab(ui: &mut egui::Ui, state: &mut AppState, diff: &FileDiff) {
             ui.horizontal(|ui| {
                 ui.label(
                     RichText::new(
-                        "💡 Tip: Click any added (+) or removed (−) line to select individual lines for partial Staging / Unstaging / Reverting.",
+                        "Tip: Click any added (+) or removed (-) line to select individual lines for partial Staging / Unstaging / Reverting.",
                     )
                     .size(11.0)
                     .color(VsCodeTheme::TEXT_MUTED),
@@ -322,7 +344,7 @@ fn render_hunk_block(
         .map(|s| s.len())
         .unwrap_or(0);
 
-    // 1. Barra Header dell'Hunk (con azioni Stage Hunk / Unstage Hunk / Revert Hunk + Selected Lines!)
+    // 1. Barra Header dell'Hunk
     let header_frame = egui::Frame::NONE
         .fill(VsCodeTheme::DIFF_HUNK_HEADER_BG)
         .stroke(Stroke::new(1.0_f32, VsCodeTheme::BORDER))
@@ -350,10 +372,9 @@ fn render_hunk_block(
                 );
             }
 
-            // Pulsanti interattivi di Hunk e Righe Selezionate (come le CodeLens/Action bar di VS Code!)
+            // Pulsanti interattivi di Hunk e Righe Selezionate
             ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                 if !diff.is_untracked {
-                    // Azioni sull'intero Hunk
                     if diff.target.can_stage() {
                         if hunk_pill_button(
                             ui,
@@ -370,7 +391,7 @@ fn render_hunk_block(
                     if diff.target.can_unstage() {
                         if hunk_pill_button(
                             ui,
-                            "− Unstage Hunk",
+                            "- Unstage Hunk",
                             VsCodeTheme::ACCENT_BLUE,
                             "Unstage this entire hunk (git apply --cached --reverse)",
                         ) {
@@ -383,7 +404,7 @@ fn render_hunk_block(
                     if diff.target.can_revert() {
                         if hunk_pill_button(
                             ui,
-                            "↶ Revert Hunk",
+                            "Revert Hunk",
                             Color32::from_rgb(0x8E, 0x34, 0x2B),
                             "Discard changes in this hunk from Working Tree (git apply --reverse)",
                         ) {
@@ -408,7 +429,7 @@ fn render_hunk_block(
                         }
 
                         if diff.target.can_revert() {
-                            let lbl = format!("↶ Revert Selected ({})", selected_count);
+                            let lbl = format!("Revert Selected ({})", selected_count);
                             if hunk_pill_button(
                                 ui,
                                 &lbl,
@@ -454,7 +475,7 @@ fn render_hunk_block(
                         }
 
                         if diff.target.can_unstage() {
-                            let lbl = format!("− Unstage Selected ({})", selected_count);
+                            let lbl = format!("- Unstage Selected ({})", selected_count);
                             if hunk_pill_button(
                                 ui,
                                 &lbl,
@@ -527,7 +548,6 @@ fn render_hunk_inline(
         if ui.is_rect_visible(rect) {
             let painter = ui.painter();
 
-            // Sfondo della riga
             let bg = if is_selected {
                 VsCodeTheme::DIFF_SELECTED_LINE_BG
             } else {
@@ -539,26 +559,20 @@ fn render_hunk_inline(
             };
             painter.rect_filled(rect, CornerRadius::ZERO, bg);
 
-            // Barra laterale sinistra (gutter indicator 3px)
             match line.kind {
                 DiffLineKind::Added => {
-                    let g = Rect::from_min_max(
-                        rect.min,
-                        Pos2::new(rect.left() + 3.0, rect.bottom()),
-                    );
+                    let g =
+                        Rect::from_min_max(rect.min, Pos2::new(rect.left() + 3.0, rect.bottom()));
                     painter.rect_filled(g, CornerRadius::ZERO, VsCodeTheme::GIT_ADDED);
                 }
                 DiffLineKind::Removed => {
-                    let g = Rect::from_min_max(
-                        rect.min,
-                        Pos2::new(rect.left() + 3.0, rect.bottom()),
-                    );
+                    let g =
+                        Rect::from_min_max(rect.min, Pos2::new(rect.left() + 3.0, rect.bottom()));
                     painter.rect_filled(g, CornerRadius::ZERO, VsCodeTheme::GIT_DELETED);
                 }
                 DiffLineKind::Context => {}
             }
 
-            // Numeri di riga (old_ln | new_ln | sign)
             let old_s = line
                 .old_lineno
                 .map(|n| format!("{:>4}", n))
@@ -589,7 +603,6 @@ fn render_hunk_inline(
                 VsCodeTheme::TEXT_MUTED,
             );
 
-            // Contenuto codice con Syntax Highlighting
             let code_x = rect.left() + 92.0;
             draw_highlighted_code_line(
                 painter,
@@ -629,7 +642,6 @@ fn render_hunk_side_by_side(
             Vec2::new(half_w, row_h),
         );
 
-        // Separatore centrale verticale
         if ui.is_rect_visible(row_rect) {
             ui.painter().line_segment(
                 [
@@ -640,7 +652,6 @@ fn render_hunk_side_by_side(
             );
         }
 
-        // Cella Sinistra (Originale / Rimozioni)
         render_sbs_cell(
             ui,
             state,
@@ -649,8 +660,6 @@ fn render_hunk_side_by_side(
             left_rect,
             row.left.as_ref(),
         );
-
-        // Cella Destra (Modificato / Aggiunte)
         render_sbs_cell(
             ui,
             state,
@@ -710,7 +719,6 @@ fn render_sbs_cell(
         };
         painter.rect_filled(rect, CornerRadius::ZERO, bg);
 
-        // Gutter indicator 3px
         match c.kind {
             DiffLineKind::Added => {
                 painter.rect_filled(
@@ -908,13 +916,17 @@ fn render_file_editor_tab(
         );
         ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
             ui.add_space(10.0);
-            let save_btn = egui::Button::new(
-                RichText::new("💾 Save (Ctrl+S)")
-                    .size(12.0)
-                    .color(Color32::WHITE),
+            if codicon_text_button(
+                ui,
+                Codicon::Save,
+                "Save (Ctrl+S)",
+                VsCodeTheme::ACCENT_BLUE,
+                Color32::WHITE,
+                Vec2::new(115.0, 24.0),
+                CornerRadius::same(3),
             )
-            .fill(VsCodeTheme::ACCENT_BLUE);
-            if ui.add(save_btn).clicked() {
+            .clicked()
+            {
                 state.save_file_editor(tab_idx);
             }
         });
@@ -949,7 +961,7 @@ fn render_empty_editor_watermark(ui: &mut egui::Ui, state: &mut AppState) {
             ui.add_space(top_pad);
 
             ui.label(
-                RichText::new("Visual Studio Code — Source Control (Git)")
+                RichText::new("Visual Studio Code - Source Control (Git)")
                     .size(18.0)
                     .strong()
                     .color(VsCodeTheme::TEXT_DIM),
@@ -968,17 +980,17 @@ fn render_empty_editor_watermark(ui: &mut egui::Ui, state: &mut AppState) {
                     .color(VsCodeTheme::TEXT_MUTED),
             );
             ui.label(
-                RichText::new("• Ctrl+Shift+P  —  Open Git Command Palette / Quick Pick")
+                RichText::new("- Ctrl+Shift+P  :  Open Git Command Palette / Quick Pick")
                     .size(12.0)
                     .color(VsCodeTheme::TEXT_DIM),
             );
             ui.label(
-                RichText::new("• Ctrl+Enter    —  Commit staged/working changes")
+                RichText::new("- Ctrl+Enter    :  Commit staged/working changes")
                     .size(12.0)
                     .color(VsCodeTheme::TEXT_DIM),
             );
             ui.label(
-                RichText::new("• Click Branch in Status Bar  —  Checkout / Create Branch")
+                RichText::new("- Click Branch in Status Bar  :  Checkout / Create Branch")
                     .size(12.0)
                     .color(VsCodeTheme::TEXT_DIM),
             );
@@ -986,17 +998,16 @@ fn render_empty_editor_watermark(ui: &mut egui::Ui, state: &mut AppState) {
             if state.repo_path.is_none() {
                 ui.add_space(16.0);
                 let ctx = ui.ctx().clone();
-                if ui
-                    .add(
-                        egui::Button::new(
-                            RichText::new("📂 Open Repository Folder...")
-                                .size(13.0)
-                                .color(Color32::WHITE),
-                        )
-                        .fill(VsCodeTheme::ACCENT_BLUE)
-                        .min_size(Vec2::new(220.0, 30.0)),
-                    )
-                    .clicked()
+                if codicon_text_button(
+                    ui,
+                    Codicon::Folder,
+                    "Open Repository Folder...",
+                    VsCodeTheme::ACCENT_BLUE,
+                    Color32::WHITE,
+                    Vec2::new(220.0, 30.0),
+                    CornerRadius::same(3),
+                )
+                .clicked()
                 {
                     if let Some(folder) = rfd::FileDialog::new().pick_folder() {
                         state.open_repository(folder, &ctx);

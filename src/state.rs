@@ -51,7 +51,7 @@ impl CenterTab {
                     .and_then(|s| s.to_str())
                     .unwrap_or(path);
                 if *dirty {
-                    format!("● {}", name)
+                    format!("* {}", name)
                 } else {
                     name.to_string()
                 }
@@ -103,6 +103,7 @@ pub enum ActiveSidebarPanel {
     SourceControl,
     GraphFull,
     Repositories,
+    Settings,
 }
 
 pub enum WorkerEvent {
@@ -193,7 +194,9 @@ pub struct AppState {
 
     // Async worker & Watcher
     pub is_busy: bool,
+    pub is_refreshing_status: bool,
     pub busy_label: String,
+    pub last_refresh_time: Instant,
     pub last_error: Option<String>,
     pub toast_notification: Option<(String, Instant)>,
     tx: Sender<WorkerEvent>,
@@ -244,7 +247,9 @@ impl AppState {
             scroll_to_hunk: None,
             quick_pick: None,
             is_busy: false,
+            is_refreshing_status: false,
             busy_label: String::new(),
+            last_refresh_time: Instant::now(),
             last_error: None,
             toast_notification: None,
             tx,
@@ -314,7 +319,19 @@ impl AppState {
         }
 
         if let Some(ref mut w) = self.watcher {
-            if w.poll_should_refresh() && !self.is_busy {
+            if w.poll_should_refresh() && !self.is_busy && !self.is_refreshing_status {
+                self.trigger_refresh();
+            }
+        }
+
+        // Timer periodico configurabile "Refresh git status" (in secondi)
+        if self.repo_path.is_some() && self.settings.refresh_interval_secs > 0 {
+            let interval = std::time::Duration::from_secs(self.settings.refresh_interval_secs);
+            ctx.request_repaint_after(interval);
+            if self.last_refresh_time.elapsed() >= interval
+                && !self.is_busy
+                && !self.is_refreshing_status
+            {
                 self.trigger_refresh();
             }
         }
@@ -329,8 +346,12 @@ impl AppState {
                     graph,
                     logs,
                 } => {
-                    self.is_busy = false;
-                    self.busy_label.clear();
+                    self.is_refreshing_status = false;
+                    self.last_refresh_time = Instant::now();
+                    if self.busy_label == "Refreshing Git status..." {
+                        self.is_busy = false;
+                        self.busy_label.clear();
+                    }
                     self.status = status;
                     self.graph_commits = graph;
                     self.git_logs.extend(logs);
@@ -366,6 +387,7 @@ impl AppState {
                 }
                 WorkerEvent::OperationFailed { error, logs } => {
                     self.is_busy = false;
+                    self.is_refreshing_status = false;
                     self.busy_label.clear();
                     self.git_logs.extend(logs);
                     self.last_error = Some(error);
@@ -387,8 +409,12 @@ impl AppState {
             return;
         };
         let tx = self.tx.clone();
-        self.is_busy = true;
-        self.busy_label = "Refreshing Git status...".to_string();
+        self.is_refreshing_status = true;
+        self.last_refresh_time = Instant::now();
+        if self.settings.show_refresh_status_message {
+            self.is_busy = true;
+            self.busy_label = "Refreshing Git status...".to_string();
+        }
 
         thread::spawn(move || match fetch_repo_status(&repo) {
             Ok((status, mut logs)) => {

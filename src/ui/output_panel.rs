@@ -1,5 +1,5 @@
 use crate::state::AppState;
-use crate::theme::VsCodeTheme;
+use crate::theme::{Codicon, VsCodeTheme, codicon_button};
 use egui::{RichText, Stroke};
 
 pub fn render_output_panel(ctx: &egui::Context, state: &mut AppState) {
@@ -20,21 +20,13 @@ pub fn render_output_panel(ctx: &egui::Context, state: &mut AppState) {
         .show(ctx, |ui| {
             ui.horizontal(|ui| {
                 ui.label(
-                    RichText::new("OUTPUT — Git")
+                    RichText::new("OUTPUT - Git")
                         .size(11.0)
                         .strong()
                         .color(VsCodeTheme::TEXT_BRIGHT),
                 );
                 ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                    if ui
-                        .small_button(
-                            RichText::new("×")
-                                .size(13.0)
-                                .color(VsCodeTheme::TEXT_PRIMARY),
-                        )
-                        .on_hover_text("Close Panel")
-                        .clicked()
-                    {
+                    if codicon_button(ui, Codicon::Close, "Close Panel") {
                         state.settings.show_output_panel = false;
                         state.settings.save();
                     }

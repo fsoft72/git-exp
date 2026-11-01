@@ -1,9 +1,10 @@
 use crate::git::ops::{self, CommitVariant};
 use crate::state::{AppState, QuickPickKind, QuickPickState};
-use crate::theme::VsCodeTheme;
+use crate::theme::{Codicon, VsCodeTheme, codicon_button, draw_inline_codicon};
 use egui::{Color32, CornerRadius, Key, Order, Pos2, RichText, Sense, Stroke, Vec2};
 
 struct QuickPickItem {
+    icon: Option<Codicon>,
     label: String,
     detail: String,
     action: Box<dyn FnOnce(&mut AppState)>,
@@ -22,7 +23,6 @@ pub fn render_quick_pick_modal(ctx: &egui::Context, state: &mut AppState) {
         return;
     };
 
-    // Chiudi con Escape
     if ctx.input(|i| i.key_pressed(Key::Escape)) {
         state.quick_pick = None;
         return;
@@ -81,10 +81,10 @@ fn render_quick_pick_body(ui: &mut egui::Ui, state: &mut AppState, qp: &QuickPic
         QuickPickKind::CreateTag => "Git: Create Tag at HEAD (Enter tag name and press Enter)",
         QuickPickKind::DeleteTag => "Git: Delete Tag (Select a tag to delete)",
         QuickPickKind::ConfirmDiscardAll => {
-            "⚠ Discard ALL working tree & untracked changes? (Cannot be undone)"
+            "Discard ALL working tree & untracked changes? (Cannot be undone)"
         }
         QuickPickKind::ConfirmDiscardFile { path, .. } => {
-            &format!("⚠ Discard changes in '{}'?", path)
+            &format!("Discard changes in '{}'?", path)
         }
     };
 
@@ -96,17 +96,13 @@ fn render_quick_pick_body(ui: &mut egui::Ui, state: &mut AppState, qp: &QuickPic
                 .color(VsCodeTheme::TEXT_MUTED),
         );
         ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-            if ui
-                .small_button(RichText::new("Esc ×").size(11.0).color(VsCodeTheme::TEXT_MUTED))
-                .clicked()
-            {
+            if codicon_button(ui, Codicon::Close, "Close (Esc)") {
                 state.quick_pick = None;
             }
         });
     });
     ui.add_space(4.0);
 
-    // Input di testo / filtro
     let mut query = qp.query.clone();
     let mut submitted_enter = false;
 
@@ -144,7 +140,6 @@ fn render_quick_pick_body(ui: &mut egui::Ui, state: &mut AppState, qp: &QuickPic
         current_qp.just_opened = false;
     }
 
-    // Se è una modale di puro input (CreateBranch, RenameBranch, StashPush, CreateTag)
     match &qp.kind {
         QuickPickKind::CreateBranch { from_ref } => {
             ui.add_space(6.0);
@@ -215,9 +210,7 @@ fn render_quick_pick_body(ui: &mut egui::Ui, state: &mut AppState, qp: &QuickPic
         _ => {}
     }
 
-    // Costruisci la lista di elementi selezionabili per i picker a lista
     let items = build_quick_pick_items(state, &qp.kind, &query);
-
     let item_count = items.len();
     let mut selected_idx = qp.selected_index.min(item_count.saturating_sub(1));
 
@@ -278,6 +271,18 @@ fn render_quick_pick_body(ui: &mut egui::Ui, state: &mut AppState, qp: &QuickPic
                         .layout(egui::Layout::left_to_right(egui::Align::Center)),
                 );
                 row_ui.add_space(8.0);
+                if let Some(ic) = item.icon {
+                    draw_inline_codicon(
+                        &mut row_ui,
+                        ic,
+                        15.0,
+                        if is_sel {
+                            VsCodeTheme::TEXT_BRIGHT
+                        } else {
+                            VsCodeTheme::TEXT_PRIMARY
+                        },
+                    );
+                }
                 row_ui.label(
                     RichText::new(&item.label).size(12.5).color(if is_sel {
                         VsCodeTheme::TEXT_BRIGHT
@@ -322,7 +327,8 @@ fn build_quick_pick_items(
     match kind {
         QuickPickKind::Checkout => {
             raw.push(QuickPickItem {
-                label: "+ Create new branch...".to_string(),
+                icon: Some(Codicon::Plus),
+                label: "Create new branch...".to_string(),
                 detail: "git checkout -b".to_string(),
                 action: Box::new(|st| {
                     st.quick_pick = Some(QuickPickState::new(QuickPickKind::CreateBranch {
@@ -334,16 +340,17 @@ fn build_quick_pick_items(
             for br in &state.status.branches {
                 let name = br.name.clone();
                 let is_rem = br.is_remote;
-                let prefix = if br.is_current {
-                    "✓ "
+                let ic = if br.is_current {
+                    Codicon::Check
                 } else if br.is_remote {
-                    "☁ "
+                    Codicon::CloudUpload
                 } else {
-                    "⎇ "
+                    Codicon::GitBranch
                 };
                 raw.push(QuickPickItem {
-                    label: format!("{}{}", prefix, name),
-                    detail: format!("{} · {}", br.commit_short, br.subject),
+                    icon: Some(ic),
+                    label: name.clone(),
+                    detail: format!("{} - {}", br.commit_short, br.subject),
                     action: Box::new(move |st| {
                         st.spawn_git_task("Checking out branch...", move |repo| {
                             ops::checkout_branch(repo, &name, is_rem)
@@ -357,8 +364,9 @@ fn build_quick_pick_items(
             for tag in &state.status.tags {
                 let tname = tag.name.clone();
                 raw.push(QuickPickItem {
-                    label: format!("🏷 {}", tname),
-                    detail: format!("tag · {}", tag.commit_short),
+                    icon: Some(Codicon::Tag),
+                    label: tname.clone(),
+                    detail: format!("tag - {}", tag.commit_short),
                     action: Box::new(move |st| {
                         st.spawn_git_task("Checking out tag...", move |repo| {
                             ops::checkout_branch(repo, &tname, false)
@@ -379,7 +387,8 @@ fn build_quick_pick_items(
             {
                 let name = br.name.clone();
                 raw.push(QuickPickItem {
-                    label: format!("🗑 {}", name),
+                    icon: Some(Codicon::Trash),
+                    label: name.clone(),
                     detail: br.commit_short.clone(),
                     action: Box::new(move |st| {
                         st.spawn_git_task("Deleting branch...", move |repo| {
@@ -395,7 +404,8 @@ fn build_quick_pick_items(
             for br in state.status.branches.iter().filter(|b| !b.is_current) {
                 let name = br.name.clone();
                 raw.push(QuickPickItem {
-                    label: format!("⎇ Merge '{}' into '{}'", name, state.status.head_name),
+                    icon: Some(Codicon::GitBranch),
+                    label: format!("Merge '{}' into '{}'", name, state.status.head_name),
                     detail: br.commit_short.clone(),
                     action: Box::new(move |st| {
                         st.spawn_git_task("Merging branch...", move |repo| {
@@ -411,7 +421,8 @@ fn build_quick_pick_items(
             for br in state.status.branches.iter().filter(|b| !b.is_current) {
                 let name = br.name.clone();
                 raw.push(QuickPickItem {
-                    label: format!("⎇ Rebase '{}' onto '{}'", state.status.head_name, name),
+                    icon: Some(Codicon::GitBranch),
+                    label: format!("Rebase '{}' onto '{}'", state.status.head_name, name),
                     detail: br.commit_short.clone(),
                     action: Box::new(move |st| {
                         st.spawn_git_task("Rebasing branch...", move |repo| {
@@ -433,6 +444,7 @@ fn build_quick_pick_items(
                 let r = st_entry.reference.clone();
                 let verb = op_verb.to_string();
                 raw.push(QuickPickItem {
+                    icon: Some(Codicon::Archive),
                     label: format!("{}: {}", st_entry.reference, st_entry.message),
                     detail: st_entry.relative_time.clone(),
                     action: Box::new(move |st| {
@@ -449,7 +461,8 @@ fn build_quick_pick_items(
             for tag in &state.status.tags {
                 let tname = tag.name.clone();
                 raw.push(QuickPickItem {
-                    label: format!("🗑 Delete tag '{}'", tname),
+                    icon: Some(Codicon::Trash),
+                    label: format!("Delete tag '{}'", tname),
                     detail: tag.commit_short.clone(),
                     action: Box::new(move |st| {
                         st.spawn_git_task("Deleting tag...", move |repo| {
@@ -463,11 +476,13 @@ fn build_quick_pick_items(
         }
         QuickPickKind::ConfirmDiscardAll => {
             raw.push(QuickPickItem {
-                label: "↶ Yes, Discard All Changes (git checkout -- . && git clean -fd)".into(),
+                icon: Some(Codicon::Discard),
+                label: "Yes, Discard All Changes (git checkout -- . && git clean -fd)".into(),
                 detail: "Destructive".into(),
                 action: Box::new(|st| st.discard_all_confirmed()),
             });
             raw.push(QuickPickItem {
+                icon: Some(Codicon::Close),
                 label: "Cancel".into(),
                 detail: "Esc".into(),
                 action: Box::new(|_| {}),
@@ -477,11 +492,13 @@ fn build_quick_pick_items(
             let p = path.clone();
             let k = *kind;
             raw.push(QuickPickItem {
-                label: format!("↶ Yes, Discard Changes in '{}'", p),
+                icon: Some(Codicon::Discard),
+                label: format!("Yes, Discard Changes in '{}'", p),
                 detail: "Destructive".into(),
                 action: Box::new(move |st| st.discard_file_confirmed(p, k)),
             });
             raw.push(QuickPickItem {
+                icon: Some(Codicon::Close),
                 label: "Cancel".into(),
                 detail: "Esc".into(),
                 action: Box::new(|_| {}),
@@ -489,6 +506,7 @@ fn build_quick_pick_items(
         }
         QuickPickKind::CommandPalette => {
             raw.push(QuickPickItem {
+                icon: Some(Codicon::GitBranch),
                 label: "Git: Checkout to...".into(),
                 detail: "Switch branch or tag".into(),
                 action: Box::new(|st| {
@@ -496,6 +514,7 @@ fn build_quick_pick_items(
                 }),
             });
             raw.push(QuickPickItem {
+                icon: Some(Codicon::Plus),
                 label: "Git: Create Branch...".into(),
                 detail: "git checkout -b".into(),
                 action: Box::new(|st| {
@@ -505,11 +524,13 @@ fn build_quick_pick_items(
                 }),
             });
             raw.push(QuickPickItem {
+                icon: Some(Codicon::Check),
                 label: "Git: Commit".into(),
                 detail: "Ctrl+Enter".into(),
                 action: Box::new(|st| st.execute_commit(CommitVariant::Normal)),
             });
             raw.push(QuickPickItem {
+                icon: Some(Codicon::Check),
                 label: "Git: Commit (Amend)".into(),
                 detail: "git commit --amend".into(),
                 action: Box::new(|st| {
@@ -518,6 +539,7 @@ fn build_quick_pick_items(
                 }),
             });
             raw.push(QuickPickItem {
+                icon: Some(Codicon::Sync),
                 label: "Git: Sync".into(),
                 detail: "Pull & Push".into(),
                 action: Box::new(|st| {
@@ -531,6 +553,7 @@ fn build_quick_pick_items(
                 }),
             });
             raw.push(QuickPickItem {
+                icon: Some(Codicon::ArrowDown),
                 label: "Git: Pull".into(),
                 detail: "git pull".into(),
                 action: Box::new(|st| {
@@ -542,6 +565,7 @@ fn build_quick_pick_items(
                 }),
             });
             raw.push(QuickPickItem {
+                icon: Some(Codicon::ArrowUp),
                 label: "Git: Push".into(),
                 detail: "git push".into(),
                 action: Box::new(|st| {
@@ -556,6 +580,7 @@ fn build_quick_pick_items(
                 }),
             });
             raw.push(QuickPickItem {
+                icon: Some(Codicon::Refresh),
                 label: "Git: Fetch All (Prune)".into(),
                 detail: "git fetch --all --prune".into(),
                 action: Box::new(|st| {
@@ -567,16 +592,19 @@ fn build_quick_pick_items(
                 }),
             });
             raw.push(QuickPickItem {
+                icon: Some(Codicon::Plus),
                 label: "Git: Stage All Changes".into(),
                 detail: "git add -A".into(),
                 action: Box::new(|st| st.stage_all()),
             });
             raw.push(QuickPickItem {
+                icon: Some(Codicon::Minus),
                 label: "Git: Unstage All Changes".into(),
                 detail: "git reset HEAD".into(),
                 action: Box::new(|st| st.unstage_all()),
             });
             raw.push(QuickPickItem {
+                icon: Some(Codicon::Archive),
                 label: "Git: Stash Changes...".into(),
                 detail: "git stash push".into(),
                 action: Box::new(|st| {
@@ -586,6 +614,7 @@ fn build_quick_pick_items(
                 }),
             });
             raw.push(QuickPickItem {
+                icon: Some(Codicon::Archive),
                 label: "Git: Pop Stash...".into(),
                 detail: "git stash pop".into(),
                 action: Box::new(|st| {
@@ -593,6 +622,7 @@ fn build_quick_pick_items(
                 }),
             });
             raw.push(QuickPickItem {
+                icon: Some(Codicon::GitBranch),
                 label: "Git: Merge Branch...".into(),
                 detail: "git merge".into(),
                 action: Box::new(|st| {
@@ -600,6 +630,7 @@ fn build_quick_pick_items(
                 }),
             });
             raw.push(QuickPickItem {
+                icon: Some(Codicon::GitBranch),
                 label: "Git: Rebase Branch...".into(),
                 detail: "git rebase".into(),
                 action: Box::new(|st| {
@@ -607,14 +638,17 @@ fn build_quick_pick_items(
                 }),
             });
             raw.push(QuickPickItem {
+                icon: Some(Codicon::Trash),
                 label: "Git: Delete Branch...".into(),
                 detail: "git branch -d".into(),
                 action: Box::new(|st| {
-                    st.quick_pick =
-                        Some(QuickPickState::new(QuickPickKind::DeleteBranch { force: false }));
+                    st.quick_pick = Some(QuickPickState::new(QuickPickKind::DeleteBranch {
+                        force: false,
+                    }));
                 }),
             });
             raw.push(QuickPickItem {
+                icon: Some(Codicon::Tag),
                 label: "Git: Create Tag...".into(),
                 detail: "git tag".into(),
                 action: Box::new(|st| {
@@ -622,6 +656,7 @@ fn build_quick_pick_items(
                 }),
             });
             raw.push(QuickPickItem {
+                icon: Some(Codicon::Discard),
                 label: "Git: Undo Last Commit".into(),
                 detail: "git reset --soft HEAD~1".into(),
                 action: Box::new(|st| {
@@ -633,6 +668,7 @@ fn build_quick_pick_items(
                 }),
             });
             raw.push(QuickPickItem {
+                icon: Some(Codicon::FileCode),
                 label: "Git: Show Git Output".into(),
                 detail: "Toggle Output Panel".into(),
                 action: Box::new(|st| {

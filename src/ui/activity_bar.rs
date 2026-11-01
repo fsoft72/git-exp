@@ -51,8 +51,8 @@ pub fn render_activity_bar(ctx: &egui::Context, state: &mut AppState) {
                     state.active_sidebar = ActiveSidebarPanel::Repositories;
                 }
 
-                // Spazio elastico fino al fondo
-                let remaining = (ui.available_height() - 104.0).max(8.0);
+                // Spazio elastico fino al fondo (3 icone in basso: Output, Command Palette, Gear Settings)
+                let remaining = (ui.available_height() - 152.0).max(8.0);
                 ui.add_space(remaining);
 
                 // 4. Git Output Panel toggle
@@ -61,7 +61,7 @@ pub fn render_activity_bar(ctx: &egui::Context, state: &mut AppState) {
                     state.settings.show_output_panel,
                     ActivityIcon::OutputTerminal,
                     None,
-                    "Toggle Git Output Log (Ctrl+Shift+U)",
+                    "Toggle Git Output Log",
                 ) {
                     state.settings.show_output_panel = !state.settings.show_output_panel;
                     state.settings.save();
@@ -77,6 +77,18 @@ pub fn render_activity_bar(ctx: &egui::Context, state: &mut AppState) {
                 ) {
                     state.quick_pick = Some(QuickPickState::new(QuickPickKind::CommandPalette));
                 }
+
+                // 6. Settings Gear icon in fondo alla toolbar di sinistra
+                let settings_active = state.active_sidebar == ActiveSidebarPanel::Settings;
+                if draw_activity_item(
+                    ui,
+                    settings_active,
+                    ActivityIcon::SettingsGear,
+                    None,
+                    "Settings & Git Refresh Configuration",
+                ) {
+                    state.active_sidebar = ActiveSidebarPanel::Settings;
+                }
             });
         });
 }
@@ -87,6 +99,7 @@ enum ActivityIcon {
     Repositories,
     OutputTerminal,
     CommandPalette,
+    SettingsGear,
 }
 
 fn draw_activity_item(
@@ -122,7 +135,6 @@ fn draw_activity_item(
 
         match icon {
             ActivityIcon::SourceControl => {
-                // Disegna l'icona ufficiale Git Branch di VS Code (Codicon `source-control`)
                 let top_node = Pos2::new(c.x - 5.0, c.y - 8.0);
                 let bot_node = Pos2::new(c.x - 5.0, c.y + 8.0);
                 let right_node = Pos2::new(c.x + 6.0, c.y - 3.0);
@@ -131,7 +143,6 @@ fn draw_activity_item(
                 painter.circle_stroke(bot_node, 2.7, stroke);
                 painter.circle_stroke(right_node, 2.7, stroke);
 
-                // Linea principale verticale
                 painter.line_segment(
                     [
                         Pos2::new(top_node.x, top_node.y + 2.8),
@@ -139,7 +150,6 @@ fn draw_activity_item(
                     ],
                     stroke,
                 );
-                // Curva di diramazione dal basso verso il nodo destro
                 painter.line_segment(
                     [
                         Pos2::new(bot_node.x, c.y + 2.0),
@@ -156,7 +166,6 @@ fn draw_activity_item(
                 );
             }
             ActivityIcon::CommitGraph => {
-                // Icona grafo con 3 nodi collegati
                 let n1 = Pos2::new(c.x - 6.0, c.y - 7.0);
                 let n2 = Pos2::new(c.x - 6.0, c.y + 7.0);
                 let n3 = Pos2::new(c.x + 5.0, c.y);
@@ -168,7 +177,6 @@ fn draw_activity_item(
                 painter.circle_filled(n3, 3.0, fg);
             }
             ActivityIcon::Repositories => {
-                // Icona cartella / repo
                 let r = Rect::from_center_size(c, Vec2::new(18.0, 14.0));
                 painter.rect_stroke(r, CornerRadius::same(2), stroke, egui::StrokeKind::Inside);
                 painter.line_segment(
@@ -180,21 +188,14 @@ fn draw_activity_item(
                 );
             }
             ActivityIcon::OutputTerminal => {
-                // Icona `>_` terminale / output
                 let r = Rect::from_center_size(c, Vec2::new(18.0, 14.0));
                 painter.rect_stroke(r, CornerRadius::same(2), stroke, egui::StrokeKind::Inside);
                 painter.line_segment(
-                    [
-                        Pos2::new(c.x - 5.0, c.y - 3.0),
-                        Pos2::new(c.x - 1.0, c.y),
-                    ],
+                    [Pos2::new(c.x - 5.0, c.y - 3.0), Pos2::new(c.x - 1.0, c.y)],
                     stroke,
                 );
                 painter.line_segment(
-                    [
-                        Pos2::new(c.x - 5.0, c.y + 3.0),
-                        Pos2::new(c.x - 1.0, c.y),
-                    ],
+                    [Pos2::new(c.x - 5.0, c.y + 3.0), Pos2::new(c.x - 1.0, c.y)],
                     stroke,
                 );
                 painter.line_segment(
@@ -206,14 +207,45 @@ fn draw_activity_item(
                 );
             }
             ActivityIcon::CommandPalette => {
-                // Icona ingranaggio / comandi
-                let r = Rect::from_center_size(c, Vec2::new(16.0, 16.0));
+                // Icona Command Palette (finestra comando con prompt `>`)
+                let r = Rect::from_center_size(c, Vec2::new(18.0, 14.0));
                 painter.rect_stroke(r, CornerRadius::same(3), stroke, egui::StrokeKind::Inside);
-                painter.circle_stroke(c, 3.5, stroke);
+                painter.line_segment(
+                    [Pos2::new(c.x - 4.0, c.y - 2.5), Pos2::new(c.x, c.y)],
+                    stroke,
+                );
+                painter.line_segment(
+                    [Pos2::new(c.x - 4.0, c.y + 2.5), Pos2::new(c.x, c.y)],
+                    stroke,
+                );
+            }
+            ActivityIcon::SettingsGear => {
+                // Ingranaggio a 8 denti stile VS Code Settings Gear (`settings-gear`)
+                let inner_r = 3.2_f32;
+                let outer_ring = 6.2_f32;
+                let tooth_inner = 5.5_f32;
+                let tooth_outer = 8.6_f32;
+                let tooth_stroke = Stroke::new(2.2_f32, fg);
+
+                for i in 0..8 {
+                    let angle = (i as f32) * std::f32::consts::FRAC_PI_4;
+                    let p_in = Pos2::new(
+                        c.x + tooth_inner * angle.cos(),
+                        c.y + tooth_inner * angle.sin(),
+                    );
+                    let p_out = Pos2::new(
+                        c.x + tooth_outer * angle.cos(),
+                        c.y + tooth_outer * angle.sin(),
+                    );
+                    painter.line_segment([p_in, p_out], tooth_stroke);
+                }
+                painter.circle_stroke(c, outer_ring, Stroke::new(2.0_f32, fg));
+                painter.circle_filled(c, inner_r, VsCodeTheme::ACTIVITY_BAR_BG);
+                painter.circle_stroke(c, inner_r, Stroke::new(1.4_f32, fg));
             }
         }
 
-        // Badge numerico blu in basso a destra (stile VS Code Activity Bar)
+        // Badge numerico blu in basso a destra
         if let Some(count) = badge_count {
             if count > 0 {
                 let badge_text = if count > 99 {

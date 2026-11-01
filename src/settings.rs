@@ -2,19 +2,22 @@ use serde::{Deserialize, Serialize};
 use std::fs;
 use std::path::PathBuf;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
 pub enum ScmFileViewMode {
+    #[default]
     List,
     Tree,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
 pub enum DiffViewMode {
+    #[default]
     SideBySide,
     Inline,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(default)]
 pub struct UserSettings {
     pub recent_repos: Vec<String>,
     pub file_view_mode: ScmFileViewMode,
@@ -22,6 +25,11 @@ pub struct UserSettings {
     pub show_graph_section: bool,
     pub show_output_panel: bool,
     pub commit_signoff: bool,
+    /// Intervallo di "Refresh git status" automatico in secondi (0 = disabilitato).
+    pub refresh_interval_secs: u64,
+    /// Se `true`, mostra lo spinner e il messaggio "Refreshing Git status..." nella Status Bar;
+    /// se `false` (silent), esegue il refresh in background senza mostrare il messaggio nella Status Bar.
+    pub show_refresh_status_message: bool,
 }
 
 impl Default for UserSettings {
@@ -33,6 +41,8 @@ impl Default for UserSettings {
             show_graph_section: true,
             show_output_panel: false,
             commit_signoff: false,
+            refresh_interval_secs: 5,
+            show_refresh_status_message: true,
         }
     }
 }
@@ -73,4 +83,3 @@ impl UserSettings {
         self.save();
     }
 }
-
