@@ -1029,12 +1029,10 @@ fn render_repositories_sidebar(ui: &mut egui::Ui, ctx: &egui::Context, state: &m
                 } else {
                     format!("{} ({})", br.name, br.commit_short)
                 };
-                if ui
+                let resp = ui
                     .selectable_label(br.is_current, label_text)
-                    .on_hover_text(&br.subject)
-                    .clicked()
-                    && !br.is_current
-                {
+                    .on_hover_text(format!("{}\nRight-click for branch actions", br.subject));
+                if resp.clicked() && !br.is_current {
                     let name = br.name.clone();
                     let is_rem = br.is_remote;
                     state.spawn_git_task("Checking out branch...", move |repo| {
@@ -1043,6 +1041,57 @@ fn render_repositories_sidebar(ui: &mut egui::Ui, ctx: &egui::Context, state: &m
                             .map_err(|(e, l)| (e, vec![l]))
                     });
                 }
+                resp.context_menu(|ui| {
+                    ui.set_min_width(190.0);
+                    if ui
+                        .button(format!("Create Branch from '{}'...", br.name))
+                        .clicked()
+                    {
+                        state.quick_pick =
+                            Some(QuickPickState::new(QuickPickKind::CreateBranch {
+                                from_ref: Some(br.name.clone()),
+                            }));
+                        ui.close_menu();
+                    }
+                    if !br.is_current && ui.button(format!("Checkout '{}'", br.name)).clicked() {
+                        let name = br.name.clone();
+                        let is_rem = br.is_remote;
+                        state.spawn_git_task("Checking out branch...", move |repo| {
+                            ops::checkout_branch(repo, &name, is_rem)
+                                .map(|l| (format!("Checkout su '{}'", name), vec![l]))
+                                .map_err(|(e, l)| (e, vec![l]))
+                        });
+                        ui.close_menu();
+                    }
+                    if !br.is_current
+                        && ui
+                            .button(format!(
+                                "Merge '{}' into '{}'",
+                                br.name, state.status.head_name
+                            ))
+                            .clicked()
+                    {
+                        let name = br.name.clone();
+                        state.spawn_git_task("Merging branch...", move |repo| {
+                            ops::merge_branch(repo, &name)
+                                .map(|l| (format!("Merge di '{}' completato", name), vec![l]))
+                                .map_err(|(e, l)| (e, vec![l]))
+                        });
+                        ui.close_menu();
+                    }
+                    if !br.is_current
+                        && !br.is_remote
+                        && ui.button(format!("Delete Branch '{}'", br.name)).clicked()
+                    {
+                        let name = br.name.clone();
+                        state.spawn_git_task("Deleting branch...", move |repo| {
+                            ops::delete_branch(repo, &name, false)
+                                .map(|l| (format!("Branch '{}' eliminato", name), vec![l]))
+                                .map_err(|(e, l)| (e, vec![l]))
+                        });
+                        ui.close_menu();
+                    }
+                });
             });
         }
 
@@ -1438,6 +1487,12 @@ fn render_more_actions_menu(ui: &mut egui::Ui, state: &mut AppState) {
         if ui.button("Create Branch...").clicked() {
             state.quick_pick = Some(QuickPickState::new(QuickPickKind::CreateBranch {
                 from_ref: None,
+            }));
+            ui.close_menu();
+        }
+        if ui.button("Create Branch From...").clicked() {
+            state.quick_pick = Some(QuickPickState::new(QuickPickKind::CreateBranchFrom {
+                preset_name: None,
             }));
             ui.close_menu();
         }

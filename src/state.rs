@@ -65,6 +65,7 @@ pub enum QuickPickKind {
     CommandPalette,
     Checkout,
     CreateBranch { from_ref: Option<String> },
+    CreateBranchFrom { preset_name: Option<String> },
     DeleteBranch { force: bool },
     RenameBranch,
     MergeBranch,
@@ -201,6 +202,7 @@ pub struct AppState {
     pub toast_notification: Option<(String, Instant)>,
     tx: Sender<WorkerEvent>,
     rx: Receiver<WorkerEvent>,
+    pub egui_ctx: Option<egui::Context>,
     pub watcher: Option<RepoWatcher>,
     pub highlighter: SyntaxHighlighter,
 }
@@ -254,6 +256,7 @@ impl AppState {
             toast_notification: None,
             tx,
             rx,
+            egui_ctx: None,
             watcher: None,
             highlighter: SyntaxHighlighter::default(),
         };
@@ -311,6 +314,9 @@ impl AppState {
     }
 
     pub fn poll_background(&mut self, ctx: &egui::Context) {
+        if self.egui_ctx.is_none() {
+            self.egui_ctx = Some(ctx.clone());
+        }
         // Assicura che il watcher sia attivo
         if self.watcher.is_none() {
             if let Some(ref repo) = self.repo_path {
@@ -422,6 +428,7 @@ impl AppState {
             return;
         };
         let tx = self.tx.clone();
+        let ctx_opt = self.egui_ctx.clone();
         self.is_refreshing_status = true;
         self.last_refresh_time = Instant::now();
         if self.settings.show_refresh_status_message {
@@ -429,23 +436,28 @@ impl AppState {
             self.busy_label = "Refreshing Git status...".to_string();
         }
 
-        thread::spawn(move || match fetch_repo_status(&repo) {
-            Ok((status, mut logs)) => {
-                let upstream = status.upstream.clone();
-                let (graph, graph_logs) =
-                    fetch_commit_graph(&repo, upstream.as_deref(), 200).unwrap_or_default();
-                logs.extend(graph_logs);
-                let _ = tx.send(WorkerEvent::RefreshCompleted {
-                    status,
-                    graph,
-                    logs,
-                });
+        thread::spawn(move || {
+            match fetch_repo_status(&repo) {
+                Ok((status, mut logs)) => {
+                    let upstream = status.upstream.clone();
+                    let (graph, graph_logs) =
+                        fetch_commit_graph(&repo, upstream.as_deref(), 200).unwrap_or_default();
+                    logs.extend(graph_logs);
+                    let _ = tx.send(WorkerEvent::RefreshCompleted {
+                        status,
+                        graph,
+                        logs,
+                    });
+                }
+                Err(e) => {
+                    let _ = tx.send(WorkerEvent::OperationFailed {
+                        error: e,
+                        logs: Vec::new(),
+                    });
+                }
             }
-            Err(e) => {
-                let _ = tx.send(WorkerEvent::OperationFailed {
-                    error: e,
-                    logs: Vec::new(),
-                });
+            if let Some(ref ctx) = ctx_opt {
+                ctx.request_repaint();
             }
         });
     }
@@ -463,17 +475,26 @@ impl AppState {
         self.busy_label = label.to_string();
         self.last_error = None;
         let tx = self.tx.clone();
+        let ctx_opt = self.egui_ctx.clone();
+        if let Some(ref ctx) = ctx_opt {
+            ctx.request_repaint();
+        }
 
-        thread::spawn(move || match f(&repo) {
-            Ok((message, logs)) => {
-                let _ = tx.send(WorkerEvent::OperationCompleted {
-                    message,
-                    logs,
-                    refresh_needed: true,
-                });
+        thread::spawn(move || {
+            match f(&repo) {
+                Ok((message, logs)) => {
+                    let _ = tx.send(WorkerEvent::OperationCompleted {
+                        message,
+                        logs,
+                        refresh_needed: true,
+                    });
+                }
+                Err((error, logs)) => {
+                    let _ = tx.send(WorkerEvent::OperationFailed { error, logs });
+                }
             }
-            Err((error, logs)) => {
-                let _ = tx.send(WorkerEvent::OperationFailed { error, logs });
+            if let Some(ref ctx) = ctx_opt {
+                ctx.request_repaint();
             }
         });
     }

@@ -57,40 +57,53 @@ pub fn render_quick_pick_modal(ctx: &egui::Context, state: &mut AppState) {
 
 fn render_quick_pick_body(ui: &mut egui::Ui, state: &mut AppState, qp: &QuickPickState) {
     let title = match &qp.kind {
-        QuickPickKind::CommandPalette => "Git Command Palette",
-        QuickPickKind::Checkout => "Git: Checkout to... (Select a ref to checkout)",
-        QuickPickKind::CreateBranch { from_ref: None } => {
-            "Git: Create Branch (Enter new branch name and press Enter)"
-        }
+        QuickPickKind::CommandPalette => "Git Command Palette".to_string(),
+        QuickPickKind::Checkout => "Git: Checkout to... (Select a ref or type a new branch name)".to_string(),
+        QuickPickKind::CreateBranch { from_ref: None } => format!(
+            "Git: Create Branch from '{}' (Enter new branch name and press Enter)",
+            state.status.head_name
+        ),
         QuickPickKind::CreateBranch {
             from_ref: Some(r),
-        } => &format!("Git: Create Branch from '{}' (Enter branch name)", r),
-        QuickPickKind::DeleteBranch { .. } => "Git: Delete Branch (Select a branch to delete)",
-        QuickPickKind::RenameBranch => "Git: Rename Current Branch (Enter new name)",
-        QuickPickKind::MergeBranch => "Git: Merge Branch into current branch",
-        QuickPickKind::RebaseBranch => "Git: Rebase Current Branch onto...",
+        } => format!("Git: Create Branch from '{}' (Enter branch name and press Enter)", r),
+        QuickPickKind::CreateBranchFrom { preset_name: None } => {
+            "Git: Create Branch From... (Select base branch or tag)".to_string()
+        }
+        QuickPickKind::CreateBranchFrom {
+            preset_name: Some(name),
+        } => format!("Git: Create Branch '{}' From... (Select base branch or tag)", name),
+        QuickPickKind::DeleteBranch { .. } => {
+            "Git: Delete Branch (Select a branch to delete)".to_string()
+        }
+        QuickPickKind::RenameBranch => {
+            "Git: Rename Current Branch (Enter new name)".to_string()
+        }
+        QuickPickKind::MergeBranch => "Git: Merge Branch into current branch".to_string(),
+        QuickPickKind::RebaseBranch => "Git: Rebase Current Branch onto...".to_string(),
         QuickPickKind::StashPush {
             include_untracked: false,
-        } => "Git: Stash Changes (Optional message, press Enter to stash)",
+        } => "Git: Stash Changes (Optional message, press Enter to stash)".to_string(),
         QuickPickKind::StashPush {
             include_untracked: true,
-        } => "Git: Stash Including Untracked (Optional message, press Enter)",
-        QuickPickKind::StashPop => "Git: Pop Stash (Select a stash to pop)",
-        QuickPickKind::StashApply => "Git: Apply Stash (Select a stash to apply)",
-        QuickPickKind::StashDrop => "Git: Drop Stash (Select a stash to delete)",
-        QuickPickKind::CreateTag => "Git: Create Tag at HEAD (Enter tag name and press Enter)",
-        QuickPickKind::DeleteTag => "Git: Delete Tag (Select a tag to delete)",
+        } => "Git: Stash Including Untracked (Optional message, press Enter)".to_string(),
+        QuickPickKind::StashPop => "Git: Pop Stash (Select a stash to pop)".to_string(),
+        QuickPickKind::StashApply => "Git: Apply Stash (Select a stash to apply)".to_string(),
+        QuickPickKind::StashDrop => "Git: Drop Stash (Select a stash to delete)".to_string(),
+        QuickPickKind::CreateTag => {
+            "Git: Create Tag at HEAD (Enter tag name and press Enter)".to_string()
+        }
+        QuickPickKind::DeleteTag => "Git: Delete Tag (Select a tag to delete)".to_string(),
         QuickPickKind::ConfirmDiscardAll => {
-            "Discard ALL working tree & untracked changes? (Cannot be undone)"
+            "Discard ALL working tree & untracked changes? (Cannot be undone)".to_string()
         }
         QuickPickKind::ConfirmDiscardFile { path, .. } => {
-            &format!("Discard changes in '{}'?", path)
+            format!("Discard changes in '{}'?", path)
         }
     };
 
     ui.horizontal(|ui| {
         ui.label(
-            RichText::new(title)
+            RichText::new(&title)
                 .size(11.5)
                 .strong()
                 .color(VsCodeTheme::TEXT_MUTED),
@@ -114,12 +127,22 @@ fn render_quick_pick_body(ui: &mut egui::Ui, state: &mut AppState, qp: &QuickPic
         .show(ui, |ui| {
             let hint = match &qp.kind {
                 QuickPickKind::CreateBranch { .. } => "New branch name (e.g. feat/new-ui)...",
+                QuickPickKind::CreateBranchFrom { .. } => "Select base branch or tag...",
                 QuickPickKind::RenameBranch => "New branch name...",
                 QuickPickKind::StashPush { .. } => "Optional stash message (press Enter)...",
                 QuickPickKind::CreateTag => "Tag name (e.g. v0.2.0)...",
                 _ => "Type to filter commands or branches...",
             };
+            let input_id = ui.make_persistent_id((
+                "vscode_quick_pick_input",
+                std::mem::discriminant(&qp.kind),
+            ));
+            if qp.just_opened {
+                ui.memory_mut(|m| m.request_focus(input_id));
+                ui.ctx().request_repaint();
+            }
             let te = egui::TextEdit::singleline(&mut query)
+                .id(input_id)
                 .hint_text(RichText::new(hint).color(VsCodeTheme::TEXT_MUTED))
                 .desired_width(f32::INFINITY)
                 .frame(false);
@@ -127,7 +150,20 @@ fn render_quick_pick_body(ui: &mut egui::Ui, state: &mut AppState, qp: &QuickPic
             if qp.just_opened {
                 resp.request_focus();
             }
-            if ui.input(|i| i.key_pressed(Key::Enter)) {
+            let enter_pressed = ui.input(|i| {
+                i.key_pressed(Key::Enter)
+                    || i.events.iter().any(|ev| {
+                        matches!(
+                            ev,
+                            egui::Event::Key {
+                                key: Key::Enter,
+                                pressed: true,
+                                ..
+                            }
+                        )
+                    })
+            });
+            if !qp.just_opened && (enter_pressed || (resp.lost_focus() && enter_pressed)) {
                 submitted_enter = true;
             }
         });
@@ -141,70 +177,29 @@ fn render_quick_pick_body(ui: &mut egui::Ui, state: &mut AppState, qp: &QuickPic
     }
 
     match &qp.kind {
-        QuickPickKind::CreateBranch { from_ref } => {
+        QuickPickKind::CreateBranch { .. }
+        | QuickPickKind::RenameBranch
+        | QuickPickKind::CreateTag
+            if query.trim().is_empty() =>
+        {
             ui.add_space(6.0);
+            let help_msg = match &qp.kind {
+                QuickPickKind::CreateBranch { .. } => {
+                    "Type the new branch name above and press Enter to create and checkout."
+                }
+                QuickPickKind::RenameBranch => {
+                    "Type the new branch name above and press Enter to rename."
+                }
+                QuickPickKind::CreateTag => {
+                    "Type the tag name above and press Enter to create the tag."
+                }
+                _ => "",
+            };
             ui.label(
-                RichText::new("Press Enter to create and checkout the new branch.")
+                RichText::new(help_msg)
                     .size(11.5)
                     .color(VsCodeTheme::TEXT_MUTED),
             );
-            if submitted_enter && !query.trim().is_empty() {
-                let name = query.trim().to_string();
-                let base = from_ref.clone();
-                state.quick_pick = None;
-                state.spawn_git_task("Creating branch...", move |repo| {
-                    ops::create_branch(repo, &name, base.as_deref(), true)
-                        .map(|l| (format!("Creato e attivato branch '{}'", name), vec![l]))
-                        .map_err(|(e, l)| (e, vec![l]))
-                });
-            }
-            return;
-        }
-        QuickPickKind::RenameBranch => {
-            if submitted_enter && !query.trim().is_empty() {
-                let name = query.trim().to_string();
-                state.quick_pick = None;
-                state.spawn_git_task("Renaming branch...", move |repo| {
-                    ops::rename_branch(repo, &name)
-                        .map(|l| (format!("Branch rinominato in '{}'", name), vec![l]))
-                        .map_err(|(e, l)| (e, vec![l]))
-                });
-            }
-            return;
-        }
-        QuickPickKind::StashPush { include_untracked } => {
-            let inc = *include_untracked;
-            ui.add_space(6.0);
-            ui.label(
-                RichText::new("Press Enter to save stash (leave empty for default message).")
-                    .size(11.5)
-                    .color(VsCodeTheme::TEXT_MUTED),
-            );
-            if submitted_enter {
-                let msg = if query.trim().is_empty() {
-                    None
-                } else {
-                    Some(query.trim().to_string())
-                };
-                state.quick_pick = None;
-                state.spawn_git_task("Stashing changes...", move |repo| {
-                    ops::stash_push(repo, msg.as_deref(), inc)
-                        .map(|l| ("Modifiche salvate nello Stash".into(), vec![l]))
-                        .map_err(|(e, l)| (e, vec![l]))
-                });
-            }
-            return;
-        }
-        QuickPickKind::CreateTag => {
-            if submitted_enter && !query.trim().is_empty() {
-                let tag_name = query.trim().to_string();
-                state.quick_pick = None;
-                state.spawn_git_task("Creating tag...", move |repo| {
-                    ops::create_tag(repo, &tag_name, None)
-                        .map(|l| (format!("Tag '{}' creato", tag_name), vec![l]))
-                        .map_err(|(e, l)| (e, vec![l]))
-                });
-            }
             return;
         }
         _ => {}
@@ -313,6 +308,7 @@ fn render_quick_pick_body(ui: &mut egui::Ui, state: &mut AppState, qp: &QuickPic
         if let Some(item) = items.into_iter().nth(chosen) {
             (item.action)(state);
         }
+        ui.ctx().request_repaint();
     }
 }
 
@@ -321,22 +317,199 @@ fn build_quick_pick_items(
     kind: &QuickPickKind,
     query: &str,
 ) -> Vec<QuickPickItem> {
-    let q = query.trim().to_ascii_lowercase();
+    let trimmed = query.trim();
+    let q = trimmed.to_ascii_lowercase();
     let mut raw: Vec<QuickPickItem> = Vec::new();
 
     match kind {
-        QuickPickKind::Checkout => {
+        QuickPickKind::CreateBranch { from_ref } => {
+            if !trimmed.is_empty() {
+                let name = trimmed.to_string();
+                let base = from_ref.clone();
+                let base_label = base
+                    .as_deref()
+                    .unwrap_or(&state.status.head_name)
+                    .to_string();
+                raw.push(QuickPickItem {
+                    icon: Some(Codicon::Plus),
+                    label: format!("Create and checkout branch '{}'", name),
+                    detail: format!("from '{}'", base_label),
+                    action: Box::new(move |st| {
+                        st.spawn_git_task("Creating branch...", move |repo| {
+                            ops::create_branch(repo, &name, base.as_deref(), true)
+                                .map(|l| (format!("Creato e attivato branch '{}'", name), vec![l]))
+                                .map_err(|(e, l)| (e, vec![l]))
+                        });
+                    }),
+                });
+            }
+            return raw;
+        }
+        QuickPickKind::RenameBranch => {
+            if !trimmed.is_empty() {
+                let name = trimmed.to_string();
+                raw.push(QuickPickItem {
+                    icon: Some(Codicon::GitBranch),
+                    label: format!(
+                        "Rename branch '{}' to '{}'",
+                        state.status.head_name, name
+                    ),
+                    detail: "git branch -m".to_string(),
+                    action: Box::new(move |st| {
+                        st.spawn_git_task("Renaming branch...", move |repo| {
+                            ops::rename_branch(repo, &name)
+                                .map(|l| (format!("Branch rinominato in '{}'", name), vec![l]))
+                                .map_err(|(e, l)| (e, vec![l]))
+                        });
+                    }),
+                });
+            }
+            return raw;
+        }
+        QuickPickKind::StashPush { include_untracked } => {
+            let inc = *include_untracked;
+            let msg_opt = if trimmed.is_empty() {
+                None
+            } else {
+                Some(trimmed.to_string())
+            };
+            let label = match &msg_opt {
+                Some(m) => format!("Stash changes with message '{}'", m),
+                None => "Stash changes (default message)".to_string(),
+            };
             raw.push(QuickPickItem {
-                icon: Some(Codicon::Plus),
-                label: "Create new branch...".to_string(),
-                detail: "git checkout -b".to_string(),
-                action: Box::new(|st| {
-                    st.quick_pick = Some(QuickPickState::new(QuickPickKind::CreateBranch {
-                        from_ref: None,
-                    }));
+                icon: Some(Codicon::Archive),
+                label,
+                detail: if inc {
+                    "git stash push -u".to_string()
+                } else {
+                    "git stash push".to_string()
+                },
+                action: Box::new(move |st| {
+                    st.spawn_git_task("Stashing changes...", move |repo| {
+                        ops::stash_push(repo, msg_opt.as_deref(), inc)
+                            .map(|l| ("Modifiche salvate nello Stash".into(), vec![l]))
+                            .map_err(|(e, l)| (e, vec![l]))
+                    });
                 }),
             });
+            return raw;
+        }
+        QuickPickKind::CreateTag => {
+            if !trimmed.is_empty() {
+                let tag_name = trimmed.to_string();
+                raw.push(QuickPickItem {
+                    icon: Some(Codicon::Tag),
+                    label: format!("Create tag '{}' at HEAD", tag_name),
+                    detail: "git tag".to_string(),
+                    action: Box::new(move |st| {
+                        st.spawn_git_task("Creating tag...", move |repo| {
+                            ops::create_tag(repo, &tag_name, None)
+                                .map(|l| (format!("Tag '{}' creato", tag_name), vec![l]))
+                                .map_err(|(e, l)| (e, vec![l]))
+                        });
+                    }),
+                });
+            }
+            return raw;
+        }
+        QuickPickKind::CreateBranchFrom { preset_name } => {
+            for br in &state.status.branches {
+                let base_ref = br.name.clone();
+                let preset = preset_name.clone();
+                let ic = if br.is_current {
+                    Codicon::Check
+                } else if br.is_remote {
+                    Codicon::CloudUpload
+                } else {
+                    Codicon::GitBranch
+                };
+                raw.push(QuickPickItem {
+                    icon: Some(ic),
+                    label: base_ref.clone(),
+                    detail: format!("{} - {}", br.commit_short, br.subject),
+                    action: Box::new(move |st| {
+                        if let Some(new_name) = preset {
+                            st.spawn_git_task("Creating branch...", move |repo| {
+                                ops::create_branch(repo, &new_name, Some(&base_ref), true)
+                                    .map(|l| {
+                                        (
+                                            format!(
+                                                "Creato e attivato branch '{}' da '{}'",
+                                                new_name, base_ref
+                                            ),
+                                            vec![l],
+                                        )
+                                    })
+                                    .map_err(|(e, l)| (e, vec![l]))
+                            });
+                        } else {
+                            st.quick_pick =
+                                Some(QuickPickState::new(QuickPickKind::CreateBranch {
+                                    from_ref: Some(base_ref),
+                                }));
+                        }
+                    }),
+                });
+            }
+            for tag in &state.status.tags {
+                let base_ref = tag.name.clone();
+                let preset = preset_name.clone();
+                raw.push(QuickPickItem {
+                    icon: Some(Codicon::Tag),
+                    label: base_ref.clone(),
+                    detail: format!("tag - {}", tag.commit_short),
+                    action: Box::new(move |st| {
+                        if let Some(new_name) = preset {
+                            st.spawn_git_task("Creating branch...", move |repo| {
+                                ops::create_branch(repo, &new_name, Some(&base_ref), true)
+                                    .map(|l| {
+                                        (
+                                            format!(
+                                                "Creato e attivato branch '{}' da '{}'",
+                                                new_name, base_ref
+                                            ),
+                                            vec![l],
+                                        )
+                                    })
+                                    .map_err(|(e, l)| (e, vec![l]))
+                            });
+                        } else {
+                            st.quick_pick =
+                                Some(QuickPickState::new(QuickPickKind::CreateBranch {
+                                    from_ref: Some(base_ref),
+                                }));
+                        }
+                    }),
+                });
+            }
+        }
+        QuickPickKind::Checkout => {
+            if trimmed.is_empty() {
+                raw.push(QuickPickItem {
+                    icon: Some(Codicon::Plus),
+                    label: "Create new branch...".to_string(),
+                    detail: format!("from '{}'", state.status.head_name),
+                    action: Box::new(|st| {
+                        st.quick_pick = Some(QuickPickState::new(QuickPickKind::CreateBranch {
+                            from_ref: None,
+                        }));
+                    }),
+                });
+                raw.push(QuickPickItem {
+                    icon: Some(Codicon::Plus),
+                    label: "Create new branch from...".to_string(),
+                    detail: "Select base branch or tag".to_string(),
+                    action: Box::new(|st| {
+                        st.quick_pick =
+                            Some(QuickPickState::new(QuickPickKind::CreateBranchFrom {
+                                preset_name: None,
+                            }));
+                    }),
+                });
+            }
 
+            let mut ref_items: Vec<QuickPickItem> = Vec::new();
             for br in &state.status.branches {
                 let name = br.name.clone();
                 let is_rem = br.is_remote;
@@ -347,7 +520,7 @@ fn build_quick_pick_items(
                 } else {
                     Codicon::GitBranch
                 };
-                raw.push(QuickPickItem {
+                ref_items.push(QuickPickItem {
                     icon: Some(ic),
                     label: name.clone(),
                     detail: format!("{} - {}", br.commit_short, br.subject),
@@ -363,7 +536,7 @@ fn build_quick_pick_items(
 
             for tag in &state.status.tags {
                 let tname = tag.name.clone();
-                raw.push(QuickPickItem {
+                ref_items.push(QuickPickItem {
                     icon: Some(Codicon::Tag),
                     label: tname.clone(),
                     detail: format!("tag - {}", tag.commit_short),
@@ -375,6 +548,69 @@ fn build_quick_pick_items(
                         });
                     }),
                 });
+            }
+
+            if trimmed.is_empty() {
+                raw.extend(ref_items);
+                return raw;
+            } else {
+                let exact_exists = state
+                    .status
+                    .branches
+                    .iter()
+                    .any(|b| b.name.eq_ignore_ascii_case(trimmed))
+                    || state
+                        .status
+                        .tags
+                        .iter()
+                        .any(|t| t.name.eq_ignore_ascii_case(trimmed));
+
+                let filtered_refs: Vec<QuickPickItem> = ref_items
+                    .into_iter()
+                    .filter(|it| it.label.to_ascii_lowercase().contains(&q))
+                    .collect();
+
+                let new_br_name = trimmed.to_string();
+                let new_br_name_from = trimmed.to_string();
+                let head_name = state.status.head_name.clone();
+
+                let create_direct_item = QuickPickItem {
+                    icon: Some(Codicon::Plus),
+                    label: format!("Create new branch '{}'", new_br_name),
+                    detail: format!("from '{}' (git checkout -b)", head_name),
+                    action: Box::new(move |st| {
+                        st.spawn_git_task("Creating branch...", move |repo| {
+                            ops::create_branch(repo, &new_br_name, None, true)
+                                .map(|l| {
+                                    (format!("Creato e attivato branch '{}'", new_br_name), vec![l])
+                                })
+                                .map_err(|(e, l)| (e, vec![l]))
+                        });
+                    }),
+                };
+
+                let create_from_item = QuickPickItem {
+                    icon: Some(Codicon::Plus),
+                    label: format!("Create new branch '{}' from...", new_br_name_from),
+                    detail: "Select base branch or tag".to_string(),
+                    action: Box::new(move |st| {
+                        st.quick_pick =
+                            Some(QuickPickState::new(QuickPickKind::CreateBranchFrom {
+                                preset_name: Some(new_br_name_from),
+                            }));
+                    }),
+                };
+
+                if exact_exists {
+                    raw.extend(filtered_refs);
+                    raw.push(create_direct_item);
+                    raw.push(create_from_item);
+                } else {
+                    raw.push(create_direct_item);
+                    raw.push(create_from_item);
+                    raw.extend(filtered_refs);
+                }
+                return raw;
             }
         }
         QuickPickKind::DeleteBranch { force } => {
@@ -520,6 +756,16 @@ fn build_quick_pick_items(
                 action: Box::new(|st| {
                     st.quick_pick = Some(QuickPickState::new(QuickPickKind::CreateBranch {
                         from_ref: None,
+                    }));
+                }),
+            });
+            raw.push(QuickPickItem {
+                icon: Some(Codicon::Plus),
+                label: "Git: Create Branch From...".into(),
+                detail: "Select base branch/tag".into(),
+                action: Box::new(|st| {
+                    st.quick_pick = Some(QuickPickState::new(QuickPickKind::CreateBranchFrom {
+                        preset_name: None,
                     }));
                 }),
             });
@@ -677,7 +923,6 @@ fn build_quick_pick_items(
                 }),
             });
         }
-        _ => {}
     }
 
     if q.is_empty() {
@@ -689,5 +934,51 @@ fn build_quick_pick_items(
                     || it.detail.to_ascii_lowercase().contains(&q)
             })
             .collect()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::git::status::BranchInfo;
+
+    #[test]
+    fn test_checkout_typing_new_branch_keeps_create_action_first() {
+        let mut state = AppState::new(None);
+        state.status.head_name = "dev".to_string();
+        state.status.branches = vec![BranchInfo {
+            name: "dev".to_string(),
+            is_remote: false,
+            is_current: true,
+            commit_short: "abc1234".to_string(),
+            upstream: None,
+            subject: "Initial dev commit".to_string(),
+        }];
+
+        let items = build_quick_pick_items(&state, &QuickPickKind::Checkout, "feature/login");
+        assert!(
+            !items.is_empty(),
+            "Typing a new branch name in Checkout must not result in an empty list"
+        );
+        assert_eq!(items[0].label, "Create new branch 'feature/login'");
+        assert!(items[0].detail.contains("from 'dev'"));
+        assert_eq!(items[1].label, "Create new branch 'feature/login' from...");
+    }
+
+    #[test]
+    fn test_create_branch_kind_returns_action_item() {
+        let mut state = AppState::new(None);
+        state.status.head_name = "dev".to_string();
+
+        let items = build_quick_pick_items(
+            &state,
+            &QuickPickKind::CreateBranch {
+                from_ref: Some("dev".to_string()),
+            },
+            "feat/nuovo",
+        );
+        assert_eq!(items.len(), 1);
+        assert_eq!(items[0].label, "Create and checkout branch 'feat/nuovo'");
+        assert_eq!(items[0].detail, "from 'dev'");
     }
 }
