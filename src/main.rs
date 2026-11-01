@@ -90,7 +90,7 @@ fn main() -> eframe::Result<()> {
     };
 
     eframe::run_native(
-        "vscode-git-egui",
+        "git-exp",
         native_options,
         Box::new(move |cc| Ok(Box::new(VsCodeGitApp::new(cc, initial_repo)))),
     )

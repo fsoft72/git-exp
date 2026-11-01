@@ -1,8 +1,12 @@
 [package]
-name = "vscode-git-egui"
+name = "git-exp"
 version = "0.1.0"
 edition = "2024"
 description = "VS Code Source Control (Git) UI built in Rust + egui"
+
+[[bin]]
+name = "git-exp"
+path = "src/main.rs"
 
 [dependencies]
 eframe = { version = "0.31", default-features = true }
