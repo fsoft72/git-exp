@@ -1,0 +1,19 @@
+[package]
+name = "vscode-git-egui"
+version = "0.1.0"
+edition = "2024"
+description = "VS Code Source Control (Git) UI built in Rust + egui"
+
+[dependencies]
+eframe = { version = "0.31", default-features = true }
+egui = "0.31"
+egui_extras = { version = "0.31", features = ["all_loaders"] }
+syntect = { version = "5.2", default-features = false, features = ["default-fancy"] }
+notify = "8.0"
+rfd = "0.15"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+dirs = "6.0"
+open = "5.3"
+chrono = { version = "0.4", features = ["serde"] }
+
