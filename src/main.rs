@@ -8,6 +8,28 @@ mod watcher;
 use crate::state::AppState;
 use crate::theme::VsCodeTheme;
 use std::path::PathBuf;
+use std::sync::Arc;
+
+fn load_app_icon() -> Option<egui::IconData> {
+    let svg_bytes = include_bytes!("../assets/images/logo.svg");
+    let color_image = egui_extras::image::load_svg_bytes_with_size(
+        svg_bytes,
+        Some(egui::load::SizeHint::Size(256, 256)),
+    )
+    .ok()?;
+    let width = color_image.size[0] as u32;
+    let height = color_image.size[1] as u32;
+    let rgba = color_image
+        .pixels
+        .into_iter()
+        .flat_map(|c| c.to_array())
+        .collect();
+    Some(egui::IconData {
+        rgba,
+        width,
+        height,
+    })
+}
 
 struct VsCodeGitApp {
     state: AppState,
@@ -52,11 +74,17 @@ impl eframe::App for VsCodeGitApp {
 fn main() -> eframe::Result<()> {
     let initial_repo = std::env::args().nth(1).map(PathBuf::from);
 
+    let mut viewport = egui::ViewportBuilder::default()
+        .with_title("Git-Exp")
+        .with_inner_size([1360.0, 860.0])
+        .with_min_inner_size([840.0, 520.0]);
+
+    if let Some(icon) = load_app_icon() {
+        viewport = viewport.with_icon(Arc::new(icon));
+    }
+
     let native_options = eframe::NativeOptions {
-        viewport: egui::ViewportBuilder::default()
-            .with_title("Git-Exp")
-            .with_inner_size([1360.0, 860.0])
-            .with_min_inner_size([840.0, 520.0]),
+        viewport,
         ..Default::default()
     };
 
@@ -65,5 +93,19 @@ fn main() -> eframe::Result<()> {
         native_options,
         Box::new(move |cc| Ok(Box::new(VsCodeGitApp::new(cc, initial_repo)))),
     )
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_load_app_icon() {
+        let icon = load_app_icon().expect("App icon should load and rasterize from logo.svg");
+        assert_eq!(icon.width, 256);
+        assert_eq!(icon.height, 256);
+        assert_eq!(icon.rgba.len(), 256 * 256 * 4);
+        assert!(!icon.is_empty());
+    }
 }
 
