@@ -87,6 +87,7 @@ pub struct QuickPickState {
     pub query: String,
     pub selected_index: usize,
     pub just_opened: bool,
+    pub scroll_to_selected: bool,
 }
 
 impl QuickPickState {
@@ -96,6 +97,7 @@ impl QuickPickState {
             query: String::new(),
             selected_index: 0,
             just_opened: true,
+            scroll_to_selected: true,
         }
     }
 }

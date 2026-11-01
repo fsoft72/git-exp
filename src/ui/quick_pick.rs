@@ -281,6 +281,7 @@ fn render_quick_pick_body(ui: &mut egui::Ui, state: &mut AppState, qp: &QuickPic
         if current_qp.query != query {
             current_qp.query = query.clone();
             current_qp.selected_index = 0;
+            current_qp.scroll_to_selected = true;
         }
         current_qp.just_opened = false;
     }
@@ -325,23 +326,71 @@ fn render_quick_pick_body(ui: &mut egui::Ui, state: &mut AppState, qp: &QuickPic
     let mut selected_idx = qp.selected_index.min(item_count.saturating_sub(1));
 
     if item_count > 0 {
-        if ui.input(|i| i.key_pressed(Key::ArrowDown)) {
+        let down_pressed = ui.input(|i| {
+            i.key_pressed(Key::ArrowDown)
+                || i.events.iter().any(|ev| {
+                    matches!(
+                        ev,
+                        egui::Event::Key {
+                            key: Key::ArrowDown,
+                            pressed: true,
+                            ..
+                        }
+                    )
+                })
+        });
+        let up_pressed = ui.input(|i| {
+            i.key_pressed(Key::ArrowUp)
+                || i.events.iter().any(|ev| {
+                    matches!(
+                        ev,
+                        egui::Event::Key {
+                            key: Key::ArrowUp,
+                            pressed: true,
+                            ..
+                        }
+                    )
+                })
+        });
+        let page_down = ui.input(|i| i.key_pressed(Key::PageDown));
+        let page_up = ui.input(|i| i.key_pressed(Key::PageUp));
+
+        let mut changed = false;
+        if down_pressed {
             selected_idx = (selected_idx + 1) % item_count;
-            if let Some(ref mut current_qp) = state.quick_pick {
-                current_qp.selected_index = selected_idx;
-            }
+            changed = true;
         }
-        if ui.input(|i| i.key_pressed(Key::ArrowUp)) {
+        if up_pressed {
             selected_idx = if selected_idx == 0 {
                 item_count - 1
             } else {
                 selected_idx - 1
             };
+            changed = true;
+        }
+        if page_down {
+            selected_idx = (selected_idx + 8).min(item_count - 1);
+            changed = true;
+        }
+        if page_up {
+            selected_idx = selected_idx.saturating_sub(8);
+            changed = true;
+        }
+
+        if changed {
             if let Some(ref mut current_qp) = state.quick_pick {
                 current_qp.selected_index = selected_idx;
+                current_qp.scroll_to_selected = true;
             }
+            ui.ctx().request_repaint();
         }
     }
+
+    let should_scroll = state
+        .quick_pick
+        .as_ref()
+        .map(|q| q.scroll_to_selected)
+        .unwrap_or(false);
 
     ui.add_space(4.0);
     let mut triggered_index: Option<usize> = if submitted_enter && item_count > 0 {
@@ -360,6 +409,10 @@ fn render_quick_pick_body(ui: &mut egui::Ui, state: &mut AppState, qp: &QuickPic
                 let (rect, resp) =
                     ui.allocate_exact_size(Vec2::new(ui.available_width(), row_h), Sense::click());
                 let hovered = resp.hovered() || ui.rect_contains_pointer(rect);
+
+                if is_sel && should_scroll {
+                    resp.scroll_to_me(None);
+                }
 
                 if is_sel {
                     ui.painter().rect_filled(
@@ -417,6 +470,12 @@ fn render_quick_pick_body(ui: &mut egui::Ui, state: &mut AppState, qp: &QuickPic
                 }
             }
         });
+
+    if should_scroll {
+        if let Some(ref mut current_qp) = state.quick_pick {
+            current_qp.scroll_to_selected = false;
+        }
+    }
 
     if let Some(chosen) = triggered_index {
         state.quick_pick = None;
