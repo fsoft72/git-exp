@@ -54,7 +54,7 @@ fn main() -> eframe::Result<()> {
 
     let native_options = eframe::NativeOptions {
         viewport: egui::ViewportBuilder::default()
-            .with_title("Visual Studio Code — Source Control (Git)")
+            .with_title("Git-Exp")
             .with_inner_size([1360.0, 860.0])
             .with_min_inner_size([840.0, 520.0]),
         ..Default::default()

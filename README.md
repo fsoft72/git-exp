@@ -1,5 +1,7 @@
 # git-exp
 
+![git-exp UI](assets/images/ui.png)
+
 A graphical Git interface inspired by the Source Control view of Visual Studio Code.
 Built in Rust with [egui](https://github.com/emilk/egui) / eframe.
 

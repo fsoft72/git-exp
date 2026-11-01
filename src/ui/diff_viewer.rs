@@ -957,16 +957,36 @@ fn render_file_editor_tab(
 fn render_empty_editor_watermark(ui: &mut egui::Ui, state: &mut AppState) {
     ui.centered_and_justified(|ui| {
         ui.vertical_centered(|ui| {
-            let top_pad = (ui.available_height() * 0.30).max(20.0);
+            let top_pad = (ui.available_height() * 0.20).max(16.0);
             ui.add_space(top_pad);
 
             ui.label(
-                RichText::new("Visual Studio Code - Source Control (Git)")
-                    .size(18.0)
+                RichText::new("Git-Exp")
+                    .size(22.0)
                     .strong()
-                    .color(VsCodeTheme::TEXT_DIM),
+                    .color(VsCodeTheme::TEXT_BRIGHT),
             );
-            ui.add_space(10.0);
+            ui.add_space(4.0);
+            ui.label(
+                RichText::new("By Fabio Rotondo")
+                    .size(13.0)
+                    .color(VsCodeTheme::TEXT_MUTED),
+            );
+            ui.add_space(14.0);
+            ui.label(
+                RichText::new("This software is Open Source under the MIT license.")
+                    .size(12.5)
+                    .color(VsCodeTheme::TEXT_MUTED),
+            );
+            ui.add_space(8.0);
+            let link_resp = ui.hyperlink_to(
+                RichText::new("https://github.com/fsoft72/git-exp").size(12.5),
+                "https://github.com/fsoft72/git-exp",
+            );
+            if link_resp.clicked() {
+                let _ = open::that("https://github.com/fsoft72/git-exp");
+            }
+            ui.add_space(20.0);
             ui.label(
                 RichText::new("Click any file in the Source Control sidebar to inspect its Diff")
                     .size(13.0)
