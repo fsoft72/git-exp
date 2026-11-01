@@ -964,13 +964,18 @@ fn render_empty_editor_watermark(ui: &mut egui::Ui, state: &mut AppState) {
                 .size(24.0)
                 .strong()
                 .color(VsCodeTheme::TEXT_BRIGHT);
-            let galley = egui::WidgetText::from(title_text.clone())
+            let version_text = RichText::new(format!("v{}", env!("CARGO_PKG_VERSION")))
+                .size(13.0)
+                .color(VsCodeTheme::TEXT_MUTED);
+            let title_galley = egui::WidgetText::from(title_text.clone())
                 .into_galley(ui, None, f32::INFINITY, egui::TextStyle::Heading);
-            let text_width = galley.size().x;
+            let version_galley = egui::WidgetText::from(version_text.clone())
+                .into_galley(ui, None, f32::INFINITY, egui::TextStyle::Body);
             let icon_size = egui::vec2(28.0, 28.0);
             let spacing = 8.0;
-            let row_width = icon_size.x + spacing + text_width;
-            let row_height = icon_size.y.max(galley.size().y);
+            let row_width =
+                icon_size.x + spacing + title_galley.size().x + spacing + version_galley.size().x;
+            let row_height = icon_size.y.max(title_galley.size().y);
 
             ui.allocate_ui_with_layout(
                 egui::vec2(row_width, row_height),
@@ -982,6 +987,7 @@ fn render_empty_editor_watermark(ui: &mut egui::Ui, state: &mut AppState) {
                             .fit_to_exact_size(icon_size),
                     );
                     ui.label(title_text);
+                    ui.label(version_text);
                 },
             );
             ui.add_space(4.0);

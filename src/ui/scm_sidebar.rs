@@ -1255,6 +1255,41 @@ fn render_settings_sidebar(ui: &mut egui::Ui, state: &mut AppState) {
                     );
                     ui.add_space(6.0);
 
+                    ui.horizontal(|ui| {
+                        ui.label(
+                            RichText::new("Default View:")
+                                .size(12.0)
+                                .color(VsCodeTheme::TEXT_PRIMARY),
+                        );
+                        if ui
+                            .radio_value(
+                                &mut state.settings.default_file_view_mode,
+                                ScmFileViewMode::Tree,
+                                RichText::new("Tree View")
+                                    .size(12.0)
+                                    .color(VsCodeTheme::TEXT_PRIMARY),
+                            )
+                            .changed()
+                        {
+                            state.settings.file_view_mode = state.settings.default_file_view_mode;
+                            state.settings.save();
+                        }
+                        if ui
+                            .radio_value(
+                                &mut state.settings.default_file_view_mode,
+                                ScmFileViewMode::List,
+                                RichText::new("List View")
+                                    .size(12.0)
+                                    .color(VsCodeTheme::TEXT_PRIMARY),
+                            )
+                            .changed()
+                        {
+                            state.settings.file_view_mode = state.settings.default_file_view_mode;
+                            state.settings.save();
+                        }
+                    });
+                    ui.add_space(4.0);
+
                     if ui
                         .checkbox(
                             &mut state.settings.show_graph_section,
