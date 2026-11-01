@@ -10,7 +10,7 @@ permissions:
 
 env:
   APP_NAME: git-exp
-  VERSION: "0.1.0"
+  VERSION: "0.1.1"
   CARGO_TERM_COLOR: always
 
 jobs:
