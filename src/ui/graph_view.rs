@@ -5,7 +5,12 @@ use crate::state::{AppState, QuickPickKind, QuickPickState};
 use crate::theme::{Codicon, VsCodeTheme, draw_inline_codicon};
 use egui::{Color32, CornerRadius, Pos2, Rect, RichText, Sense, Stroke, Vec2};
 
-pub fn render_graph_list(ui: &mut egui::Ui, state: &mut AppState, max_rows: usize) {
+/// Height of a single graph row, shared with the virtualized scroll area of the full graph view.
+pub const GRAPH_ROW_HEIGHT: f32 = 24.0;
+
+/// Renders the commits of `state.graph_commits` that fall inside `range` (clamped to the list).
+/// Row indexes are absolute, so the edges drawn at the top of the first row come from the previous commit.
+pub fn render_graph_list(ui: &mut egui::Ui, state: &mut AppState, range: std::ops::Range<usize>) {
     let lang = state.settings.language;
     if state.graph_commits.is_empty() {
         ui.horizontal(|ui| {
@@ -24,18 +29,20 @@ pub fn render_graph_list(ui: &mut egui::Ui, state: &mut AppState, max_rows: usiz
         return;
     }
 
-    let commits: Vec<CommitNode> = state
-        .graph_commits
-        .iter()
-        .take(max_rows)
-        .cloned()
-        .collect();
+    let total = state.graph_commits.len();
+    let start = range.start.min(total);
+    let end = range.end.min(total);
+    // Commit that precedes the first rendered row: its edges enter the top of that row
+    let prev_of_first: Option<CommitNode> = start.checked_sub(1).map(|i| state.graph_commits[i].clone());
+    let commits: Vec<CommitNode> = state.graph_commits[start..end].to_vec();
 
-    let row_height = 24.0;
+    let row_height = GRAPH_ROW_HEIGHT;
     let lane_spacing = 14.0;
     let left_pad = 12.0;
 
-    let max_lane = commits
+    // The lane count is computed on the whole history so the graph column does not resize while scrolling
+    let max_lane = state
+        .graph_commits
         .iter()
         .map(|c| {
             let max_e = c
@@ -84,8 +91,13 @@ pub fn render_graph_list(ui: &mut egui::Ui, state: &mut AppState, max_rows: usiz
                 rect.left() + left_pad + (lane as f32) * lane_spacing
             };
 
-            if row_idx > 0 {
-                if let Some(prev) = commits.get(row_idx - 1) {
+            {
+                let prev = if row_idx > 0 {
+                    commits.get(row_idx - 1)
+                } else {
+                    prev_of_first.as_ref()
+                };
+                if let Some(prev) = prev {
                     for edge in &prev.edges_to_next_row {
                         let col = VsCodeTheme::GRAPH_LANES
                             [edge.color_idx % VsCodeTheme::GRAPH_LANES.len()];

@@ -110,6 +110,9 @@ pub enum ActiveSidebarPanel {
     Settings,
 }
 
+/// Number of commits loaded for the graph at first and added each time the user reaches the end.
+const GRAPH_PAGE_SIZE: usize = 200;
+
 pub enum WorkerEvent {
     /// The filesystem watcher finished its (slow) setup in the background.
     WatcherReady {
@@ -180,6 +183,8 @@ pub struct AppState {
     pub settings: UserSettings,
     pub status: RepoStatus,
     pub graph_commits: Vec<CommitNode>,
+    /// Maximum number of commits requested to git for the graph; grows while the user scrolls
+    pub graph_limit: usize,
     pub git_logs: Vec<GitCommandLog>,
 
     // Sidebar state
@@ -244,6 +249,7 @@ impl AppState {
             settings,
             status: RepoStatus::default(),
             graph_commits: Vec::new(),
+            graph_limit: GRAPH_PAGE_SIZE,
             git_logs: Vec::new(),
             active_sidebar: ActiveSidebarPanel::SourceControl,
             commit_message: String::new(),
@@ -315,6 +321,7 @@ impl AppState {
         self.last_error = None;
         self.status = RepoStatus::default();
         self.graph_commits.clear();
+        self.graph_limit = GRAPH_PAGE_SIZE;
         self.watcher = None;
         self.watcher_requested_for = None;
         // Give immediate feedback: opening a large repository can take a while
@@ -486,12 +493,24 @@ impl AppState {
         }
     }
 
+    /// Loads one more page of history when the graph shows everything git returned so far.
+    /// Does nothing if the whole history is already loaded or a refresh is running.
+    pub fn request_more_graph_commits(&mut self) {
+        // Fewer commits than requested means the history is complete
+        if self.graph_commits.len() < self.graph_limit || self.is_refreshing_status {
+            return;
+        }
+        self.graph_limit += GRAPH_PAGE_SIZE;
+        self.trigger_refresh();
+    }
+
     pub fn trigger_refresh(&mut self) {
         let Some(repo) = self.repo_path.clone() else {
             return;
         };
         let tx = self.tx.clone();
         let ctx_opt = self.egui_ctx.clone();
+        let graph_limit = self.graph_limit;
         self.is_refreshing_status = true;
         self.last_refresh_time = Instant::now();
         if self.settings.show_refresh_status_message {
@@ -509,7 +528,7 @@ impl AppState {
                 Ok((status, mut logs)) => {
                     let upstream = status.upstream.clone();
                     let (graph, graph_logs) =
-                        fetch_commit_graph(&repo, upstream.as_deref(), 200).unwrap_or_default();
+                        fetch_commit_graph(&repo, upstream.as_deref(), graph_limit).unwrap_or_default();
                     logs.extend(graph_logs);
                     let _ = tx.send(WorkerEvent::RefreshCompleted {
                         status,

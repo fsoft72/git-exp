@@ -7,7 +7,7 @@ use crate::theme::{
     Codicon, VsCodeTheme, codicon_button, codicon_text_button, draw_count_badge,
     draw_inline_codicon, paint_codicon,
 };
-use crate::ui::graph_view::render_graph_list;
+use crate::ui::graph_view::{GRAPH_ROW_HEIGHT, render_graph_list};
 use egui::{Color32, CornerRadius, FontFamily, FontId, RichText, Sense, Stroke, Vec2};
 use std::collections::BTreeMap;
 
@@ -1024,7 +1024,7 @@ fn render_collapsible_graph_section(ui: &mut egui::Ui, state: &mut AppState) {
     collapsing.store(ui.ctx());
 
     if collapsing.is_open() {
-        render_graph_list(ui, state, 28);
+        render_graph_list(ui, state, 0..28);
     }
 }
 
@@ -1057,11 +1057,16 @@ fn render_full_graph_sidebar(ui: &mut egui::Ui, state: &mut AppState) {
     ui.add_space(4.0);
     ui.separator();
 
+    let total_rows = state.graph_commits.len();
     egui::ScrollArea::vertical()
         .id_salt("full_graph_scroll")
         .auto_shrink([false, false])
-        .show(ui, |ui| {
-            render_graph_list(ui, state, 200);
+        .show_rows(ui, GRAPH_ROW_HEIGHT, total_rows, |ui, range| {
+            // Near the end of the loaded history: ask for the next page of commits
+            if range.end + 20 >= total_rows {
+                state.request_more_graph_commits();
+            }
+            render_graph_list(ui, state, range);
         });
 }
 
