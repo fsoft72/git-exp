@@ -14,7 +14,7 @@ use std::collections::BTreeMap;
 pub fn render_sidebar(ctx: &egui::Context, state: &mut AppState) {
     egui::SidePanel::left("vscode_scm_sidebar")
         .default_width(320.0)
-        .width_range(220.0..=620.0)
+        .width_range(220.0..=f32::INFINITY)
         .resizable(true)
         .frame(
             egui::Frame::NONE
