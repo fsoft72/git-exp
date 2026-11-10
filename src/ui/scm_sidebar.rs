@@ -1073,7 +1073,7 @@ fn render_collapsible_graph_section(ui: &mut egui::Ui, state: &mut AppState) {
     collapsing.store(ui.ctx());
 
     if collapsing.is_open() {
-        render_graph_list(ui, state, 0..28);
+        render_graph_scroll(ui, state, "scm_embedded_graph_scroll", Some(EMBEDDED_GRAPH_HEIGHT));
     }
 }
 
@@ -1106,17 +1106,34 @@ fn render_full_graph_sidebar(ui: &mut egui::Ui, state: &mut AppState) {
     ui.add_space(4.0);
     ui.separator();
 
+    render_graph_scroll(ui, state, "full_graph_scroll", None);
+}
+
+/// Height of the graph box embedded in the Source Control sidebar.
+const EMBEDDED_GRAPH_HEIGHT: f32 = 420.0;
+
+/// Virtualized, vertically scrollable commit graph. Asks for the next page of history near the end.
+/// `max_height` limits the box (embedded use); `None` fills the available space.
+fn render_graph_scroll(
+    ui: &mut egui::Ui,
+    state: &mut AppState,
+    id_salt: &str,
+    max_height: Option<f32>,
+) {
     let total_rows = state.graph_commits.len();
-    egui::ScrollArea::vertical()
-        .id_salt("full_graph_scroll")
-        .auto_shrink([false, false])
-        .show_rows(ui, GRAPH_ROW_HEIGHT, total_rows, |ui, range| {
-            // Near the end of the loaded history: ask for the next page of commits
-            if range.end + 20 >= total_rows {
-                state.request_more_graph_commits();
-            }
-            render_graph_list(ui, state, range);
-        });
+    let mut area = egui::ScrollArea::vertical()
+        .id_salt(id_salt)
+        .auto_shrink([false, false]);
+    if let Some(h) = max_height {
+        area = area.max_height(h).min_scrolled_height(h);
+    }
+    area.show_rows(ui, GRAPH_ROW_HEIGHT, total_rows, |ui, range| {
+        // Near the end of the loaded history: ask for the next page of commits
+        if range.end + 20 >= total_rows {
+            state.request_more_graph_commits();
+        }
+        render_graph_list(ui, state, range);
+    });
 }
 
 fn render_repositories_sidebar(ui: &mut egui::Ui, ctx: &egui::Context, state: &mut AppState) {
