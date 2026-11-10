@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- The SCM sidebar graph section sits below the changes scroll area (single scrollbar per area, no nested scrolling) and cannot widen the sidebar
 - The Source Control Graph section of the SCM sidebar is now a scrollable box filling the rest of the sidebar height (no empty area below it) showing the whole history with paged loading; before it stopped at 28 rows with no way to scroll
 
 ## 0.2.0 - 2026-11-10

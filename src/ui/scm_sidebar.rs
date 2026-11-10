@@ -138,9 +138,17 @@ fn render_source_control_panel(ui: &mut egui::Ui, state: &mut AppState) {
     ui.separator();
 
     // 3. Area scrollabile con MERGE CHANGES, STAGED CHANGES, CHANGES e SOURCE CONTROL GRAPH
+    // The graph section lives below the scroll area: reserve room for its header and a usable box
+    let reserved = if state.settings.show_graph_section {
+        GRAPH_HEADER_HEIGHT + EMBEDDED_GRAPH_MIN_HEIGHT
+    } else {
+        GRAPH_HEADER_HEIGHT
+    };
+    let scroll_max_height = (ui.available_height() - reserved).max(80.0);
     egui::ScrollArea::vertical()
         .id_salt("scm_sidebar_scroll")
-        .auto_shrink([false, false])
+        .auto_shrink([false, true])
+        .max_height(scroll_max_height)
         .show(ui, |ui| {
             // Merge Conflicts (se presenti)
             if !state.status.merge_changes.is_empty() {
@@ -178,11 +186,10 @@ fn render_source_control_panel(ui: &mut egui::Ui, state: &mut AppState) {
 
             render_ignored_section(ui, state);
 
-            ui.add_space(6.0);
-
-            // Sezione collassabile SOURCE CONTROL GRAPH
-            render_collapsible_graph_section(ui, state);
         });
+
+    // Sezione collassabile SOURCE CONTROL GRAPH (fuori dallo scroll: ha lo scroll interno)
+    render_collapsible_graph_section(ui, state);
 }
 
 fn render_commit_box_area(ui: &mut egui::Ui, state: &mut AppState) {
@@ -1008,7 +1015,7 @@ fn render_collapsible_graph_section(ui: &mut egui::Ui, state: &mut AppState) {
         state.settings.show_graph_section,
     );
 
-    let header_h = 24.0;
+    let header_h = GRAPH_HEADER_HEIGHT;
     let avail_w = ui.available_width();
     let (rect, resp) = ui.allocate_exact_size(Vec2::new(avail_w, header_h), Sense::click());
     let hovered = resp.hovered() || ui.rect_contains_pointer(rect);
@@ -1074,7 +1081,7 @@ fn render_collapsible_graph_section(ui: &mut egui::Ui, state: &mut AppState) {
 
     if collapsing.is_open() {
         // Fill the sidebar down to its bottom edge, so no empty area is left under the graph
-        let height = (ui.clip_rect().bottom() - ui.cursor().top()).max(EMBEDDED_GRAPH_MIN_HEIGHT);
+        let height = ui.available_height().max(EMBEDDED_GRAPH_MIN_HEIGHT);
         render_graph_scroll(ui, state, "scm_embedded_graph_scroll", Some(height));
     }
 }
@@ -1111,6 +1118,9 @@ fn render_full_graph_sidebar(ui: &mut egui::Ui, state: &mut AppState) {
     render_graph_scroll(ui, state, "full_graph_scroll", None);
 }
 
+/// Height of the collapsible header of the graph section.
+const GRAPH_HEADER_HEIGHT: f32 = 24.0;
+
 /// Minimum height of the graph box embedded in the Source Control sidebar.
 const EMBEDDED_GRAPH_MIN_HEIGHT: f32 = 160.0;
 
@@ -1123,8 +1133,10 @@ fn render_graph_scroll(
     max_height: Option<f32>,
 ) {
     let total_rows = state.graph_commits.len();
+    // Never let long commit subjects widen the resizable sidebar panel
     let mut area = egui::ScrollArea::vertical()
         .id_salt(id_salt)
+        .max_width(ui.available_width())
         .auto_shrink([false, false]);
     if let Some(h) = max_height {
         area = area.max_height(h).min_scrolled_height(h);
