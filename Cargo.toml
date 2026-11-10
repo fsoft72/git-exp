@@ -1,6 +1,6 @@
 [package]
 name = "git-exp"
-version = "0.2.0"
+version = "0.2.1"
 edition = "2024"
 description = "VS Code Source Control (Git) UI built in Rust + egui"
 
