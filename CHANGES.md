@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Removed the 620 px maximum width of the left sidebar (minimum stays 220 px), so the git graph can be as wide as needed
 - Git graph rows show the commit date (`YYYY-MM-DD HH:MM:SS`) after the author name; author and date are right aligned in their own column so they no longer overlap the subject. On a narrow sidebar (text area under 400 px) the author is hidden and only the date is shown
 - The SCM sidebar graph section sits below the changes scroll area (single scrollbar per area, no nested scrolling) and cannot widen the sidebar
 - The Source Control Graph section of the SCM sidebar is now a scrollable box filling the rest of the sidebar height (no empty area below it) showing the whole history with paged loading; before it stopped at 28 rows with no way to scroll
