@@ -8,6 +8,17 @@ use egui::{Color32, CornerRadius, Pos2, Rect, RichText, Sense, Stroke, Vec2};
 /// Height of a single graph row, shared with the virtualized scroll area of the full graph view.
 pub const GRAPH_ROW_HEIGHT: f32 = 24.0;
 
+/// Gap between the right aligned author and date columns.
+const META_GAP: f32 = 8.0;
+
+/// Minimum width of the text area to also show the author name next to the date.
+const MIN_WIDTH_FOR_AUTHOR: f32 = 400.0;
+
+/// Formats git's `%ci` date (`2026-10-13 13:25:07 +0200`) as `YYYY-MM-DD HH:MM:SS`, dropping the timezone.
+fn format_commit_date(iso_date: &str) -> &str {
+    iso_date.get(..19).unwrap_or(iso_date)
+}
+
 /// Renders the commits of `state.graph_commits` that fall inside `range` (clamped to the list).
 /// Row indexes are absolute, so the edges drawn at the top of the first row come from the previous commit.
 pub fn render_graph_list(ui: &mut egui::Ui, state: &mut AppState, range: std::ops::Range<usize>) {
@@ -162,11 +173,56 @@ pub fn render_graph_list(ui: &mut egui::Ui, state: &mut AppState, range: std::op
             Pos2::new(rect.left() + graph_col_width.min(avail_w * 0.4), rect.top()),
             rect.max,
         );
+        // Author and date are drawn right aligned; the subject area stops before them
+        let meta_font = egui::FontId::proportional(11.0);
+        let date_text = format_commit_date(&commit.iso_date);
+        let text_width = |text: &str| -> f32 {
+            ui.fonts(|f| {
+                f.layout_no_wrap(text.to_string(), meta_font.clone(), VsCodeTheme::TEXT_MUTED)
+                    .size()
+                    .x
+            })
+        };
+        // On a narrow sidebar the author is dropped (it stays in the tooltip) to keep the subject readable
+        let show_author = text_rect.width() >= MIN_WIDTH_FOR_AUTHOR;
+        let date_w = text_width(date_text);
+        let author_w = if show_author {
+            text_width(&commit.author) + META_GAP
+        } else {
+            0.0
+        };
+        let meta_w = date_w + author_w + META_GAP;
+        let subject_rect = Rect::from_min_max(
+            text_rect.min,
+            Pos2::new((text_rect.max.x - meta_w - META_GAP).max(text_rect.min.x), text_rect.max.y),
+        );
+        let right_x = text_rect.max.x - META_GAP;
+        let mid_y = rect.center().y;
+        ui.painter().text(
+            Pos2::new(right_x, mid_y),
+            egui::Align2::RIGHT_CENTER,
+            date_text,
+            meta_font.clone(),
+            VsCodeTheme::TEXT_MUTED,
+        );
+        if show_author {
+            ui.painter().text(
+                Pos2::new(right_x - date_w - META_GAP, mid_y),
+                egui::Align2::RIGHT_CENTER,
+                &commit.author,
+                meta_font.clone(),
+                VsCodeTheme::TEXT_MUTED,
+            );
+        }
+
         let mut row_ui = ui.new_child(
             egui::UiBuilder::new()
-                .max_rect(text_rect)
+                .max_rect(subject_rect)
                 .layout(egui::Layout::left_to_right(egui::Align::Center)),
         );
+
+        // Badges and subject must never paint over the author/date column
+        row_ui.set_clip_rect(subject_rect.intersect(row_ui.clip_rect()));
 
         // Indicatore Outgoing / Incoming con icone vettoriali
         match commit.role {
@@ -234,15 +290,6 @@ pub fn render_graph_list(ui: &mut egui::Ui, state: &mut AppState, range: std::op
             egui::Label::new(RichText::new(&commit.subject).size(12.5).color(subj_color))
                 .truncate(),
         );
-
-        row_ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-            ui.add_space(8.0);
-            ui.label(
-                RichText::new(&commit.author)
-                    .size(11.0)
-                    .color(VsCodeTheme::TEXT_MUTED),
-            );
-        });
 
         let tooltip = format!(
             "Commit: {}\n{}: {} <{}>\n{}: {} ({})\n\n{}",
@@ -323,5 +370,19 @@ pub fn render_graph_list(ui: &mut egui::Ui, state: &mut AppState, range: std::op
                 ui.close_menu();
             }
         });
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_format_commit_date() {
+        assert_eq!(
+            format_commit_date("2026-10-13 13:25:07 +0200"),
+            "2026-10-13 13:25:07"
+        );
+        assert_eq!(format_commit_date(""), "");
     }
 }
