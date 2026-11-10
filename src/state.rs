@@ -302,6 +302,8 @@ impl AppState {
         self.open_tabs.clear();
         self.active_tab_idx = 0;
         self.selected_hunk_lines.clear();
+        self.selected_change_path = None;
+        self.selected_commit_sha = None;
         self.last_error = None;
         self.watcher = RepoWatcher::new(&candidate, ctx.clone());
         self.trigger_refresh();

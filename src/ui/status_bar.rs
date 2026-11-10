@@ -19,6 +19,28 @@ pub fn render_status_bar(ctx: &egui::Context, state: &mut AppState) {
             ui.horizontal(|ui| {
                 ui.spacing_mut().item_spacing.x = 8.0;
 
+                // 0. Open Folder button: closes the current project and opens the picked one
+                if codicon_text_button(
+                    ui,
+                    Codicon::FolderOpened,
+                    tr(lang, "Open Folder", "Apri Cartella"),
+                    Color32::TRANSPARENT,
+                    VsCodeTheme::TEXT_PRIMARY,
+                    Vec2::new(0.0, 20.0),
+                    CornerRadius::same(2),
+                )
+                .on_hover_text(tr(
+                    lang,
+                    "Close the current project and open another folder",
+                    "Chiudi il progetto corrente e apri un'altra cartella",
+                ))
+                .clicked()
+                {
+                    if let Some(folder) = rfd::FileDialog::new().pick_folder() {
+                        state.open_repository(folder, ctx);
+                    }
+                }
+
                 if state.repo_path.is_some() {
                     // 1. Pulsante Branch con icona vettoriale GitBranch
                     let dirty_mark = if state.status.total_changes_count() > 0 {
