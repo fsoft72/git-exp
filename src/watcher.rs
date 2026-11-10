@@ -1,12 +1,16 @@
 use notify::{Config, Event, EventKind, RecommendedWatcher, RecursiveMode, Watcher};
 use std::collections::HashSet;
+use std::io::Write;
 use std::path::{Path, PathBuf};
-use std::process::Command;
+use std::process::{Command, Stdio};
 use std::sync::mpsc::{Receiver, channel};
 use std::time::{Duration, Instant};
 
 /// Directory names skipped when git cannot tell which folders are ignored (e.g. not a git repo).
 const FALLBACK_IGNORED_DIR_NAMES: [&str; 2] = ["node_modules", "target"];
+
+/// Upper bound of paths kept between two evaluations, to keep memory and the git call small.
+const MAX_QUEUED_PATHS: usize = 500;
 
 /// Folders that must not be scanned: the ones ignored by `.gitignore` plus git internals.
 struct IgnoredDirs {
@@ -68,6 +72,64 @@ impl IgnoredDirs {
         FALLBACK_IGNORED_DIR_NAMES.contains(&name)
     }
 
+    /// Returns true when at least one changed path can affect the git status.
+    /// Paths inside `.git` always count; ignored directories and files matched by
+    /// `.gitignore` do not. Tracked files are never considered ignored.
+    fn any_relevant(&self, paths: &[PathBuf]) -> bool {
+        let git_dir = self.root.join(".git");
+        let candidates: Vec<&PathBuf> = paths
+            .iter()
+            .filter(|p| !self.is_inside_ignored_dir(p))
+            .collect();
+        if candidates.iter().any(|p| p.starts_with(&git_dir)) || !self.git_ok {
+            return !candidates.is_empty();
+        }
+        let ignored = self.ignored_files(&candidates);
+        candidates.iter().any(|p| !ignored.contains(*p))
+    }
+
+    /// True when the path or one of its ancestors is an ignored directory.
+    fn is_inside_ignored_dir(&self, path: &Path) -> bool {
+        path.ancestors().any(|a| self.is_ignored_dir(a))
+    }
+
+    /// Asks git which of `paths` are ignored with a single `git check-ignore --stdin` call.
+    /// On any failure nothing is reported as ignored, so a refresh is never lost.
+    fn ignored_files(&self, paths: &[&PathBuf]) -> HashSet<PathBuf> {
+        let spawned = Command::new("git")
+            .current_dir(&self.root)
+            .args(["check-ignore", "--stdin", "-z"])
+            .stdin(Stdio::piped())
+            .stdout(Stdio::piped())
+            .stderr(Stdio::null())
+            .spawn();
+        let Ok(mut child) = spawned else {
+            return HashSet::new();
+        };
+        let Some(mut stdin) = child.stdin.take() else {
+            return HashSet::new();
+        };
+        let mut input = Vec::new();
+        for p in paths {
+            input.extend_from_slice(p.to_string_lossy().as_bytes());
+            input.push(0);
+        }
+        // Written from a thread so a large answer cannot block us on a full pipe
+        let writer = std::thread::spawn(move || {
+            let _ = stdin.write_all(&input);
+        });
+        let output = child.wait_with_output();
+        let _ = writer.join();
+        let Ok(out) = output else {
+            return HashSet::new();
+        };
+        String::from_utf8_lossy(&out.stdout)
+            .split('\0')
+            .filter(|s| !s.is_empty())
+            .map(PathBuf::from)
+            .collect()
+    }
+
     /// Checks a directory created after startup against the ignore rules and remembers the answer.
     fn check_new_dir(&mut self, path: &Path) -> bool {
         if self.is_ignored_dir(path) {
@@ -117,7 +179,8 @@ pub struct RepoWatcher {
     _watcher: RecommendedWatcher,
     rx: Receiver<notify::Result<Event>>,
     last_trigger: Instant,
-    pending: bool,
+    /// Paths touched since the last evaluation (evaluated at most once per refresh interval)
+    queued: HashSet<PathBuf>,
     ignored: IgnoredDirs,
 }
 
@@ -165,7 +228,7 @@ impl RepoWatcher {
             _watcher: watcher,
             rx,
             last_trigger: Instant::now(),
-            pending: false,
+            queued: HashSet::new(),
             ignored,
         })
     }
@@ -174,7 +237,9 @@ impl RepoWatcher {
     /// ed è trascorso almeno `min_interval` dall'ultimo trigger.
     pub fn poll_should_refresh(&mut self, min_interval: Duration) -> bool {
         while let Ok(Ok(event)) = self.rx.try_recv() {
-            self.pending = true;
+            if self.queued.len() < MAX_QUEUED_PATHS {
+                self.queued.extend(event.paths.iter().cloned());
+            }
             // Newly created directories are not covered by the initial walk: watch them too
             if matches!(event.kind, EventKind::Create(_)) {
                 for path in event.paths.iter().filter(|p| p.is_dir()) {
@@ -185,18 +250,19 @@ impl RepoWatcher {
             }
         }
 
-        if self.pending && self.last_trigger.elapsed() >= min_interval {
-            self.pending = false;
-            self.last_trigger = Instant::now();
-            return true;
+        if self.queued.is_empty() || self.last_trigger.elapsed() < min_interval {
+            return false;
         }
-        false
+        let paths: Vec<PathBuf> = self.queued.drain().collect();
+        self.last_trigger = Instant::now();
+        // Changes to ignored files must not cause a refresh
+        self.ignored.any_relevant(&paths)
     }
 
     /// Svuota eventuali eventi accumulati durante l'esecuzione stessa di un comando git.
     pub fn clear_pending(&mut self) {
         while self.rx.try_recv().is_ok() {}
-        self.pending = false;
+        self.queued.clear();
         self.last_trigger = Instant::now();
     }
 }
@@ -247,6 +313,15 @@ mod tests {
         w.poll_should_refresh(Duration::ZERO);
         w.clear_pending();
         std::fs::write(dir.join("cache2/y.bin"), "x").unwrap();
+        std::thread::sleep(Duration::from_millis(300));
+        assert!(!w.poll_should_refresh(Duration::ZERO));
+
+        // Ignored files in a watched folder do not trigger a refresh, others do
+        std::fs::write(dir.join(".gitignore"), "build/\ncache2/\n*.log\n").unwrap();
+        std::thread::sleep(Duration::from_millis(300));
+        w.poll_should_refresh(Duration::ZERO);
+        w.clear_pending();
+        std::fs::write(dir.join("src/debug.log"), "x").unwrap();
         std::thread::sleep(Duration::from_millis(300));
         assert!(!w.poll_should_refresh(Duration::ZERO));
 

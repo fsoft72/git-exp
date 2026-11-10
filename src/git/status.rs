@@ -144,6 +144,8 @@ pub struct RepoStatus {
     pub merge_changes: Vec<FileChange>,
     pub staged_changes: Vec<FileChange>,
     pub working_changes: Vec<FileChange>,
+    /// Paths ignored by `.gitignore` (directories end with `/`), shown in grey in the sidebar
+    pub ignored_paths: Vec<String>,
     pub branches: Vec<BranchInfo>,
     pub stashes: Vec<StashEntry>,
     pub tags: Vec<TagInfo>,
@@ -287,6 +289,31 @@ pub fn fetch_repo_status(repo_path: &Path) -> Result<(RepoStatus, Vec<GitCommand
     status.merge_head_in_progress = git_dir.join("MERGE_HEAD").exists();
     status.rebase_in_progress =
         git_dir.join("rebase-merge").exists() || git_dir.join("rebase-apply").exists();
+
+    // Fetch ignored paths (whole ignored directories are reported once, not their content)
+    if let Ok(ign_out) = run_git(
+        repo_path,
+        &[
+            "ls-files",
+            "--others",
+            "--ignored",
+            "--exclude-standard",
+            "--directory",
+            "-z",
+        ],
+        None,
+        false,
+    ) {
+        if ign_out.is_success() {
+            status.ignored_paths = ign_out
+                .stdout
+                .split('\0')
+                .filter(|p| !p.is_empty())
+                .map(str::to_string)
+                .collect();
+            status.ignored_paths.sort();
+        }
+    }
 
     // Fetch branches
     if let Ok(br_out) = run_git(

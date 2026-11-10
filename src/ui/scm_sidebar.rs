@@ -176,6 +176,8 @@ fn render_source_control_panel(ui: &mut egui::Ui, state: &mut AppState) {
                 &working_list,
             );
 
+            render_ignored_section(ui, state);
+
             ui.add_space(6.0);
 
             // Sezione collassabile SOURCE CONTROL GRAPH
@@ -948,6 +950,53 @@ fn render_tree_node_recursive(
     for file in &node.files {
         render_file_change_row(ui, state, file, indent + 8.0, false);
     }
+}
+
+/// Maximum number of ignored entries drawn, to keep the sidebar light on huge repositories.
+const MAX_IGNORED_ROWS: usize = 500;
+
+/// Collapsed-by-default section listing the paths ignored by `.gitignore`, in grey and read-only.
+fn render_ignored_section(ui: &mut egui::Ui, state: &AppState) {
+    let lang = state.settings.language;
+    let ignored = &state.status.ignored_paths;
+    if ignored.is_empty() {
+        return;
+    }
+    let title = format!("{} ({})", tr(lang, "IGNORED", "IGNORATI"), ignored.len());
+    egui::CollapsingHeader::new(
+        RichText::new(title)
+            .size(11.0)
+            .strong()
+            .color(VsCodeTheme::GIT_IGNORED),
+    )
+    .id_salt("scm_ignored_section")
+    .default_open(false)
+    .show(ui, |ui| {
+        for path in ignored.iter().take(MAX_IGNORED_ROWS) {
+            let is_dir = path.ends_with('/');
+            ui.horizontal(|ui| {
+                ui.add_space(8.0);
+                let icon = if is_dir { Codicon::Folder } else { Codicon::FileCode };
+                draw_inline_codicon(ui, icon, 14.0, VsCodeTheme::GIT_IGNORED);
+                ui.add(
+                    egui::Label::new(
+                        RichText::new(path.trim_end_matches('/'))
+                            .size(12.0)
+                            .color(VsCodeTheme::GIT_IGNORED),
+                    )
+                    .truncate(),
+                )
+                .on_hover_text(tr(lang, "Ignored by .gitignore", "Ignorato da .gitignore"));
+            });
+        }
+        if ignored.len() > MAX_IGNORED_ROWS {
+            ui.label(
+                RichText::new(format!("... +{}", ignored.len() - MAX_IGNORED_ROWS))
+                    .size(11.0)
+                    .color(VsCodeTheme::GIT_IGNORED),
+            );
+        }
+    });
 }
 
 fn render_collapsible_graph_section(ui: &mut egui::Ui, state: &mut AppState) {
