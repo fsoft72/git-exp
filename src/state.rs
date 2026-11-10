@@ -111,6 +111,11 @@ pub enum ActiveSidebarPanel {
 }
 
 pub enum WorkerEvent {
+    /// The filesystem watcher finished its (slow) setup in the background.
+    WatcherReady {
+        repo: PathBuf,
+        watcher: Option<RepoWatcher>,
+    },
     RefreshCompleted {
         status: RepoStatus,
         graph: Vec<CommitNode>,
@@ -207,6 +212,8 @@ pub struct AppState {
     rx: Receiver<WorkerEvent>,
     pub egui_ctx: Option<egui::Context>,
     pub watcher: Option<RepoWatcher>,
+    /// Repository for which a background watcher setup was already requested
+    watcher_requested_for: Option<PathBuf>,
     pub highlighter: SyntaxHighlighter,
 }
 
@@ -261,6 +268,7 @@ impl AppState {
             rx,
             egui_ctx: None,
             watcher: None,
+            watcher_requested_for: None,
             highlighter: SyntaxHighlighter::default(),
         };
 
@@ -305,8 +313,34 @@ impl AppState {
         self.selected_change_path = None;
         self.selected_commit_sha = None;
         self.last_error = None;
-        self.watcher = RepoWatcher::new(&candidate, ctx.clone());
+        self.status = RepoStatus::default();
+        self.graph_commits.clear();
+        self.watcher = None;
+        self.watcher_requested_for = None;
+        // Give immediate feedback: opening a large repository can take a while
+        self.is_busy = true;
+        self.busy_label = tr(
+            self.settings.language,
+            "Opening repository...",
+            "Apertura repository...",
+        )
+        .to_string();
+        self.spawn_watcher(&candidate, ctx);
         self.trigger_refresh();
+    }
+
+    /// Builds the filesystem watcher on a background thread (the setup is slow on big trees)
+    /// and delivers it through `WorkerEvent::WatcherReady`.
+    fn spawn_watcher(&mut self, repo: &Path, ctx: &egui::Context) {
+        self.watcher_requested_for = Some(repo.to_path_buf());
+        let tx = self.tx.clone();
+        let ctx = ctx.clone();
+        let repo = repo.to_path_buf();
+        thread::spawn(move || {
+            let watcher = RepoWatcher::new(&repo, ctx.clone());
+            let _ = tx.send(WorkerEvent::WatcherReady { repo, watcher });
+            ctx.request_repaint();
+        });
     }
 
     pub fn init_repository_at(&mut self, path: PathBuf, ctx: &egui::Context) {
@@ -336,8 +370,10 @@ impl AppState {
         }
         // Assicura che il watcher sia attivo
         if self.watcher.is_none() {
-            if let Some(ref repo) = self.repo_path {
-                self.watcher = RepoWatcher::new(repo, ctx.clone());
+            if let Some(repo) = self.repo_path.clone() {
+                if self.watcher_requested_for.as_ref() != Some(&repo) {
+                    self.spawn_watcher(&repo, ctx);
+                }
             }
         }
 
@@ -373,6 +409,12 @@ impl AppState {
 
         while let Ok(ev) = self.rx.try_recv() {
             match ev {
+                WorkerEvent::WatcherReady { repo, watcher } => {
+                    // Ignore watchers built for a repository that is no longer open
+                    if self.repo_path.as_ref() == Some(&repo) {
+                        self.watcher = watcher;
+                    }
+                }
                 WorkerEvent::RefreshCompleted {
                     status,
                     graph,
@@ -386,6 +428,8 @@ impl AppState {
                     }
                     if self.busy_label == "Refreshing Git status..."
                         || self.busy_label == "Aggiornamento stato Git..."
+                        || self.busy_label == "Opening repository..."
+                        || self.busy_label == "Apertura repository..."
                     {
                         self.is_busy = false;
                         self.busy_label.clear();
