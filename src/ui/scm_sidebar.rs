@@ -1073,7 +1073,9 @@ fn render_collapsible_graph_section(ui: &mut egui::Ui, state: &mut AppState) {
     collapsing.store(ui.ctx());
 
     if collapsing.is_open() {
-        render_graph_scroll(ui, state, "scm_embedded_graph_scroll", Some(EMBEDDED_GRAPH_HEIGHT));
+        // Fill the sidebar down to its bottom edge, so no empty area is left under the graph
+        let height = (ui.clip_rect().bottom() - ui.cursor().top()).max(EMBEDDED_GRAPH_MIN_HEIGHT);
+        render_graph_scroll(ui, state, "scm_embedded_graph_scroll", Some(height));
     }
 }
 
@@ -1109,8 +1111,8 @@ fn render_full_graph_sidebar(ui: &mut egui::Ui, state: &mut AppState) {
     render_graph_scroll(ui, state, "full_graph_scroll", None);
 }
 
-/// Height of the graph box embedded in the Source Control sidebar.
-const EMBEDDED_GRAPH_HEIGHT: f32 = 420.0;
+/// Minimum height of the graph box embedded in the Source Control sidebar.
+const EMBEDDED_GRAPH_MIN_HEIGHT: f32 = 160.0;
 
 /// Virtualized, vertically scrollable commit graph. Asks for the next page of history near the end.
 /// `max_height` limits the box (embedded use); `None` fills the available space.

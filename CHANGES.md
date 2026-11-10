@@ -2,7 +2,7 @@
 
 ## Unreleased
 
-- The Source Control Graph section of the SCM sidebar is now a scrollable box (420 px) showing the whole history with paged loading; before it stopped at 28 rows with no way to scroll
+- The Source Control Graph section of the SCM sidebar is now a scrollable box filling the rest of the sidebar height (no empty area below it) showing the whole history with paged loading; before it stopped at 28 rows with no way to scroll
 
 ## 0.2.0 - 2026-11-10
 
