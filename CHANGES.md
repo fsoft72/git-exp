@@ -1,6 +1,8 @@
 # Changes
 
-## Unreleased
+## 0.2.0 - 2026-11-10
+
+- Bumped version to `0.2.0` in `Cargo.toml`, `Cargo.lock` and the release workflow
 
 - Added a collapsed `IGNORED (n)` section in the Source Control sidebar listing paths ignored by `.gitignore` in grey (whole ignored folders are listed once, read-only)
 - The watcher no longer triggers a refresh when only ignored files change: touched paths are queued and checked with one `git check-ignore --stdin` call per refresh interval (paths inside `.git` always count)
