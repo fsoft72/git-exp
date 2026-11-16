@@ -1,7 +1,7 @@
 use crate::i18n::tr;
 use crate::state::AppState;
 use crate::theme::VsCodeTheme;
-use crate::ui::graph_view::{draw_graph_cell, graph_column_width, max_lane_of};
+use crate::ui::graph_view::{draw_graph_cell, draw_ref_badges, graph_column_width, max_lane_of};
 use egui::{Align2, CornerRadius, FontFamily, FontId, Rect, RichText, Sense, Vec2, pos2};
 
 /// Height of a commit row in the details table.
@@ -165,7 +165,6 @@ fn render_table(ui: &mut egui::Ui, state: &mut AppState) {
                 let painter = ui.painter();
                 draw_graph_cell(&painter.with_clip_rect(cols.graph), rect, prev, commit);
                 let cells = [
-                    (cols.subject, commit.subject.as_str(), &font, VsCodeTheme::TEXT_PRIMARY),
                     (cols.date, format_date(&commit.iso_date), &font, VsCodeTheme::TEXT_MUTED),
                     (cols.author, commit.author.as_str(), &font, VsCodeTheme::TEXT_MUTED),
                     (cols.commit, commit.short_sha.as_str(), &mono, VsCodeTheme::ACCENT_BLUE_HOVER),
@@ -179,6 +178,23 @@ fn render_table(ui: &mut egui::Ui, state: &mut AppState) {
                         color,
                     );
                 }
+                // Description: branch / tag pills followed by the (truncated) subject
+                let mut subj_ui = ui.new_child(
+                    egui::UiBuilder::new()
+                        .max_rect(cols.subject)
+                        .layout(egui::Layout::left_to_right(egui::Align::Center)),
+                );
+                subj_ui.set_clip_rect(cols.subject.intersect(ui.clip_rect()));
+                draw_ref_badges(&mut subj_ui, &commit.refs);
+                subj_ui.add(
+                    egui::Label::new(
+                        RichText::new(&commit.subject)
+                            .size(12.5)
+                            .color(VsCodeTheme::TEXT_PRIMARY),
+                    )
+                    .truncate()
+                    .selectable(false),
+                );
                 if resp.clicked() {
                     to_open = Some(commit.sha.clone());
                 }

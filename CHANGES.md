@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- The Graph Details tab shows the branch / tag pills before the commit description (same look as the graph in the sidebar; the pill drawing code is now shared)
 - The branch dropdown of the Graph Details tab is wider and its list can grow up to 480 px tall (it was a few rows high)
 - Added a "Details" button in the Source Control Graph header (sidebar section and full graph view): it opens a "Graph Details" tab in the central area (where the Git-Exp logo is shown when nothing is open) listing the commits of a branch with the branch graph lanes, description, date, author and commit id; a dropdown on top selects the branch (default: current branch) and a "Show Remote Branches" flag adds the remote branches to it. Clicking a row opens the commit inspector
 - Removed the 620 px maximum width of the left sidebar (minimum stays 220 px), so the git graph can be as wide as needed

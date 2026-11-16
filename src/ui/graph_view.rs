@@ -1,4 +1,4 @@
-use crate::git::graph::{CommitNode, CommitSyncRole, RefBadgeKind};
+use crate::git::graph::{CommitNode, CommitSyncRole, RefBadge, RefBadgeKind};
 use crate::git::ops;
 use crate::i18n::{Language, tr};
 use crate::state::{AppState, QuickPickKind, QuickPickState};
@@ -17,6 +17,46 @@ const MIN_WIDTH_FOR_AUTHOR: f32 = 400.0;
 /// Formats git's `%ci` date (`2026-10-13 13:25:07 +0200`) as `YYYY-MM-DD HH:MM:SS`, dropping the timezone.
 fn format_commit_date(iso_date: &str) -> &str {
     iso_date.get(..19).unwrap_or(iso_date)
+}
+
+/// Colors and icon of a ref pill, by kind.
+fn ref_badge_style(kind: &RefBadgeKind) -> (Color32, Color32, Codicon) {
+    match kind {
+        RefBadgeKind::HeadBranch => (VsCodeTheme::ACCENT_BLUE, Color32::WHITE, Codicon::GitBranch),
+        RefBadgeKind::LocalBranch => (
+            Color32::from_rgb(0x2D, 0x4F, 0x67),
+            VsCodeTheme::TEXT_BRIGHT,
+            Codicon::GitBranch,
+        ),
+        RefBadgeKind::RemoteBranch => (
+            Color32::from_rgb(0x3B, 0x2E, 0x58),
+            Color32::from_rgb(0xD9, 0xC2, 0xFF),
+            Codicon::CloudUpload,
+        ),
+        RefBadgeKind::Tag => (
+            Color32::from_rgb(0x4D, 0x41, 0x23),
+            VsCodeTheme::GIT_MODIFIED,
+            Codicon::Tag,
+        ),
+    }
+}
+
+/// Draws the branch / tag pills of a commit one after the other in the current (horizontal) layout.
+pub fn draw_ref_badges(ui: &mut egui::Ui, refs: &[RefBadge]) {
+    for badge in refs {
+        let (bg, fg, icon) = ref_badge_style(&badge.kind);
+        egui::Frame::NONE
+            .fill(bg)
+            .corner_radius(CornerRadius::same(3))
+            .inner_margin(egui::Margin::symmetric(4, 1))
+            .show(ui, |ui| {
+                ui.horizontal(|ui| {
+                    ui.spacing_mut().item_spacing.x = 2.0;
+                    draw_inline_codicon(ui, icon, 11.0, fg);
+                    ui.label(RichText::new(&badge.name).size(10.5).strong().color(fg));
+                });
+            });
+    }
 }
 
 /// Lane spacing and left padding of the graph column.
@@ -263,45 +303,7 @@ pub fn render_graph_list(ui: &mut egui::Ui, state: &mut AppState, range: std::op
         }
 
         // Badge dei branch / tag (Ref Pills)
-        for badge in &commit.refs {
-            let (bg, fg, icon) = match badge.kind {
-                RefBadgeKind::HeadBranch => {
-                    (VsCodeTheme::ACCENT_BLUE, Color32::WHITE, Codicon::GitBranch)
-                }
-                RefBadgeKind::LocalBranch => (
-                    Color32::from_rgb(0x2D, 0x4F, 0x67),
-                    VsCodeTheme::TEXT_BRIGHT,
-                    Codicon::GitBranch,
-                ),
-                RefBadgeKind::RemoteBranch => (
-                    Color32::from_rgb(0x3B, 0x2E, 0x58),
-                    Color32::from_rgb(0xD9, 0xC2, 0xFF),
-                    Codicon::CloudUpload,
-                ),
-                RefBadgeKind::Tag => (
-                    Color32::from_rgb(0x4D, 0x41, 0x23),
-                    VsCodeTheme::GIT_MODIFIED,
-                    Codicon::Tag,
-                ),
-            };
-
-            egui::Frame::NONE
-                .fill(bg)
-                .corner_radius(CornerRadius::same(3))
-                .inner_margin(egui::Margin::symmetric(4, 1))
-                .show(&mut row_ui, |ui| {
-                    ui.horizontal(|ui| {
-                        ui.spacing_mut().item_spacing.x = 2.0;
-                        draw_inline_codicon(ui, icon, 11.0, fg);
-                        ui.label(
-                            RichText::new(&badge.name)
-                                .size(10.5)
-                                .strong()
-                                .color(fg),
-                        );
-                    });
-                });
-        }
+        draw_ref_badges(&mut row_ui, &commit.refs);
 
         let subj_color = if is_selected || commit.is_head {
             VsCodeTheme::TEXT_BRIGHT
