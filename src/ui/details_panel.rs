@@ -49,7 +49,8 @@ fn render_toolbar(ui: &mut egui::Ui, state: &mut AppState) {
                 .color(VsCodeTheme::TEXT_PRIMARY),
         );
         egui::ComboBox::from_id_salt("graph_details_branch")
-            .width(220.0)
+            .width(260.0)
+            .height(480.0)
             .selected_text(selected.clone())
             .show_ui(ui, |ui| {
                 for name in &branches {
