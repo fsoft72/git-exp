@@ -28,6 +28,9 @@ pub fn render_center_panel(ctx: &egui::Context, state: &mut AppState) {
                     CenterTab::CommitView(details) => {
                         render_commit_inspector_tab(ui, state, &details)
                     }
+                    CenterTab::GraphDetails => {
+                        crate::ui::details_panel::render_details_tab(ui, state)
+                    }
                     CenterTab::FileEditor { path, .. } => {
                         let idx = state.active_tab_idx;
                         render_file_editor_tab(ui, state, idx, &path);

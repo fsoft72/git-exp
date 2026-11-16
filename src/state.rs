@@ -1,7 +1,7 @@
 use crate::git::cli::GitCommandLog;
 use crate::git::diff::{DiffTarget, FileDiff, fetch_file_diff, target_from_change};
 use crate::git::graph::{
-    BranchCommit, CommitDetails, CommitNode, fetch_branch_commits, fetch_commit_details,
+    CommitDetails, CommitNode, fetch_branch_commits, fetch_commit_details,
     fetch_commit_graph,
 };
 use crate::git::ops::{self, CommitVariant};
@@ -23,6 +23,8 @@ use syntect::parsing::SyntaxSet;
 pub enum CenterTab {
     Diff(FileDiff),
     CommitView(CommitDetails),
+    /// Branch commits table with graph lanes, opened from the graph header "Details" button
+    GraphDetails,
     FileEditor {
         path: String,
         content: String,
@@ -41,6 +43,7 @@ impl CenterTab {
                 }
             },
             Self::CommitView(c) => format!("commit:{}", c.sha),
+            Self::GraphDetails => "graph-details".to_string(),
             Self::FileEditor { path, .. } => format!("edit:{}", path),
         }
     }
@@ -49,6 +52,7 @@ impl CenterTab {
         match self {
             Self::Diff(d) => d.target.tab_title(),
             Self::CommitView(c) => format!("Commit: {}", c.short_sha),
+            Self::GraphDetails => "Graph Details".to_string(),
             Self::FileEditor { path, dirty, .. } => {
                 let name = Path::new(path)
                     .file_name()
@@ -202,12 +206,11 @@ pub struct AppState {
     pub selected_change_path: Option<(String, crate::git::status::ChangeGroup)>,
     pub selected_commit_sha: Option<String>,
 
-    // Graph Details panel (right side of the window)
-    pub details_open: bool,
+    // Graph Details tab
     /// Branch shown in the details panel; `None` follows the current branch
     pub details_branch: Option<String>,
     pub details_show_remote: bool,
-    pub details_commits: Vec<BranchCommit>,
+    pub details_commits: Vec<CommitNode>,
 
     // Center tabs & Diff state
     pub open_tabs: Vec<CenterTab>,
@@ -271,7 +274,6 @@ impl AppState {
             tree_collapsed_folders: BTreeSet::new(),
             selected_change_path: None,
             selected_commit_sha: None,
-            details_open: false,
             details_branch: None,
             details_show_remote: false,
             details_commits: Vec::new(),
@@ -520,9 +522,16 @@ impl AppState {
             .unwrap_or_else(|| self.status.head_name.clone())
     }
 
-    /// Reloads the commits listed in the details panel. No-op while the panel is closed.
+    /// `true` while the Graph Details tab is open.
+    pub fn details_open(&self) -> bool {
+        self.open_tabs
+            .iter()
+            .any(|t| matches!(t, CenterTab::GraphDetails))
+    }
+
+    /// Reloads the commits listed in the details tab. No-op while the tab is closed.
     pub fn reload_graph_details(&mut self) {
-        if !self.details_open {
+        if !self.details_open() {
             return;
         }
         let Some(repo) = self.repo_path.clone() else {
@@ -545,9 +554,17 @@ impl AppState {
         }
     }
 
-    /// Opens or closes the details panel, loading its commits when it opens.
+    /// Opens (or closes, if already open) the Graph Details tab, loading its commits when it opens.
     pub fn toggle_graph_details(&mut self) {
-        self.details_open = !self.details_open;
+        if let Some(idx) = self
+            .open_tabs
+            .iter()
+            .position(|t| matches!(t, CenterTab::GraphDetails))
+        {
+            self.close_tab(idx);
+            return;
+        }
+        self.upsert_and_activate_tab(CenterTab::GraphDetails);
         self.reload_graph_details();
     }
 

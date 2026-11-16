@@ -19,6 +19,111 @@ fn format_commit_date(iso_date: &str) -> &str {
     iso_date.get(..19).unwrap_or(iso_date)
 }
 
+/// Lane spacing and left padding of the graph column.
+const LANE_SPACING: f32 = 14.0;
+const LANE_LEFT_PAD: f32 = 12.0;
+
+/// Width of the graph column needed to draw `max_lane + 1` lanes.
+pub fn graph_column_width(max_lane: usize) -> f32 {
+    LANE_LEFT_PAD + ((max_lane + 1) as f32) * LANE_SPACING + 8.0
+}
+
+/// Highest lane index used by `commits` (nodes and edges).
+pub fn max_lane_of(commits: &[CommitNode]) -> usize {
+    commits
+        .iter()
+        .map(|c| {
+            let max_e = c
+                .edges_to_next_row
+                .iter()
+                .map(|e| e.from_lane.max(e.to_lane))
+                .max()
+                .unwrap_or(0);
+            c.node_lane.max(max_e)
+        })
+        .max()
+        .unwrap_or(0)
+}
+
+/// Draws the lanes, the edges and the node of one commit row inside `rect`.
+/// `prev` is the commit of the previous row: its edges enter the top of this row.
+pub fn draw_graph_cell(
+    painter: &egui::Painter,
+    rect: Rect,
+    prev: Option<&CommitNode>,
+    commit: &CommitNode,
+) {
+    let lane_spacing = LANE_SPACING;
+    let left_pad = LANE_LEFT_PAD;
+        let row_top = rect.top();
+        let row_mid = rect.center().y;
+        let row_bot = rect.bottom();
+
+        let lane_x = |lane: usize| -> f32 {
+            rect.left() + left_pad + (lane as f32) * lane_spacing
+        };
+
+        {
+            if let Some(prev) = prev {
+                for edge in &prev.edges_to_next_row {
+                    let col = VsCodeTheme::GRAPH_LANES
+                        [edge.color_idx % VsCodeTheme::GRAPH_LANES.len()];
+                    let stroke = Stroke::new(1.8_f32, col);
+                    let x_from = lane_x(edge.from_lane);
+                    let x_to = lane_x(edge.to_lane);
+                    if edge.from_lane == edge.to_lane {
+                        painter.line_segment(
+                            [Pos2::new(x_to, row_top), Pos2::new(x_to, row_mid)],
+                            stroke,
+                        );
+                    } else {
+                        let mid_x = (x_from + x_to) * 0.5;
+                        painter.line_segment(
+                            [Pos2::new(mid_x, row_top), Pos2::new(x_to, row_mid)],
+                            stroke,
+                        );
+                    }
+                }
+            }
+        }
+
+        for edge in &commit.edges_to_next_row {
+            let col =
+                VsCodeTheme::GRAPH_LANES[edge.color_idx % VsCodeTheme::GRAPH_LANES.len()];
+            let stroke = Stroke::new(1.8_f32, col);
+            let x_from = lane_x(edge.from_lane);
+            let x_to = lane_x(edge.to_lane);
+            if edge.from_lane == edge.to_lane {
+                painter.line_segment(
+                    [Pos2::new(x_from, row_mid), Pos2::new(x_to, row_bot)],
+                    stroke,
+                );
+            } else {
+                let mid_x = (x_from + x_to) * 0.5;
+                painter.line_segment(
+                    [Pos2::new(x_from, row_mid), Pos2::new(mid_x, row_bot)],
+                    stroke,
+                );
+            }
+        }
+
+        let cx = lane_x(commit.node_lane);
+        let center = Pos2::new(cx, row_mid);
+        let node_col = VsCodeTheme::GRAPH_LANES
+            [commit.node_color_idx % VsCodeTheme::GRAPH_LANES.len()];
+
+        if commit.is_head {
+            painter.circle_filled(center, 5.0, VsCodeTheme::SIDEBAR_BG);
+            painter.circle_stroke(center, 4.5, Stroke::new(2.2_f32, node_col));
+            painter.circle_filled(center, 2.0, Color32::WHITE);
+        } else if commit.parents.len() > 1 {
+            painter.circle_filled(center, 4.2, VsCodeTheme::SIDEBAR_BG);
+            painter.circle_stroke(center, 3.6, Stroke::new(1.8_f32, node_col));
+        } else {
+            painter.circle_filled(center, 3.6, node_col);
+        }
+}
+
 /// Renders the commits of `state.graph_commits` that fall inside `range` (clamped to the list).
 /// Row indexes are absolute, so the edges drawn at the top of the first row come from the previous commit.
 pub fn render_graph_list(ui: &mut egui::Ui, state: &mut AppState, range: std::ops::Range<usize>) {
@@ -48,25 +153,9 @@ pub fn render_graph_list(ui: &mut egui::Ui, state: &mut AppState, range: std::op
     let commits: Vec<CommitNode> = state.graph_commits[start..end].to_vec();
 
     let row_height = GRAPH_ROW_HEIGHT;
-    let lane_spacing = 14.0;
-    let left_pad = 12.0;
 
     // The lane count is computed on the whole history so the graph column does not resize while scrolling
-    let max_lane = state
-        .graph_commits
-        .iter()
-        .map(|c| {
-            let max_e = c
-                .edges_to_next_row
-                .iter()
-                .map(|e| e.from_lane.max(e.to_lane))
-                .max()
-                .unwrap_or(0);
-            c.node_lane.max(max_e)
-        })
-        .max()
-        .unwrap_or(0);
-    let graph_col_width = left_pad + ((max_lane + 1) as f32) * lane_spacing + 8.0;
+    let graph_col_width = graph_column_width(max_lane_of(&state.graph_commits));
 
     for (row_idx, commit) in commits.iter().enumerate() {
         let avail_w = ui.available_width();
@@ -93,79 +182,12 @@ pub fn render_graph_list(ui: &mut egui::Ui, state: &mut AppState, range: std::op
 
         // 1. Disegna il grafo (corsie, archi e nodo del commit) con `egui::Painter`
         if ui.is_rect_visible(rect) {
-            let painter = ui.painter();
-            let row_top = rect.top();
-            let row_mid = rect.center().y;
-            let row_bot = rect.bottom();
-
-            let lane_x = |lane: usize| -> f32 {
-                rect.left() + left_pad + (lane as f32) * lane_spacing
-            };
-
-            {
-                let prev = if row_idx > 0 {
-                    commits.get(row_idx - 1)
-                } else {
-                    prev_of_first.as_ref()
-                };
-                if let Some(prev) = prev {
-                    for edge in &prev.edges_to_next_row {
-                        let col = VsCodeTheme::GRAPH_LANES
-                            [edge.color_idx % VsCodeTheme::GRAPH_LANES.len()];
-                        let stroke = Stroke::new(1.8_f32, col);
-                        let x_from = lane_x(edge.from_lane);
-                        let x_to = lane_x(edge.to_lane);
-                        if edge.from_lane == edge.to_lane {
-                            painter.line_segment(
-                                [Pos2::new(x_to, row_top), Pos2::new(x_to, row_mid)],
-                                stroke,
-                            );
-                        } else {
-                            let mid_x = (x_from + x_to) * 0.5;
-                            painter.line_segment(
-                                [Pos2::new(mid_x, row_top), Pos2::new(x_to, row_mid)],
-                                stroke,
-                            );
-                        }
-                    }
-                }
-            }
-
-            for edge in &commit.edges_to_next_row {
-                let col =
-                    VsCodeTheme::GRAPH_LANES[edge.color_idx % VsCodeTheme::GRAPH_LANES.len()];
-                let stroke = Stroke::new(1.8_f32, col);
-                let x_from = lane_x(edge.from_lane);
-                let x_to = lane_x(edge.to_lane);
-                if edge.from_lane == edge.to_lane {
-                    painter.line_segment(
-                        [Pos2::new(x_from, row_mid), Pos2::new(x_to, row_bot)],
-                        stroke,
-                    );
-                } else {
-                    let mid_x = (x_from + x_to) * 0.5;
-                    painter.line_segment(
-                        [Pos2::new(x_from, row_mid), Pos2::new(mid_x, row_bot)],
-                        stroke,
-                    );
-                }
-            }
-
-            let cx = lane_x(commit.node_lane);
-            let center = Pos2::new(cx, row_mid);
-            let node_col = VsCodeTheme::GRAPH_LANES
-                [commit.node_color_idx % VsCodeTheme::GRAPH_LANES.len()];
-
-            if commit.is_head {
-                painter.circle_filled(center, 5.0, VsCodeTheme::SIDEBAR_BG);
-                painter.circle_stroke(center, 4.5, Stroke::new(2.2_f32, node_col));
-                painter.circle_filled(center, 2.0, Color32::WHITE);
-            } else if commit.parents.len() > 1 {
-                painter.circle_filled(center, 4.2, VsCodeTheme::SIDEBAR_BG);
-                painter.circle_stroke(center, 3.6, Stroke::new(1.8_f32, node_col));
+            let prev = if row_idx > 0 {
+                commits.get(row_idx - 1)
             } else {
-                painter.circle_filled(center, 3.6, node_col);
-            }
+                prev_of_first.as_ref()
+            };
+            draw_graph_cell(ui.painter(), rect, prev, commit);
         }
 
         // 2. Contenuto testuale a destra del grafo

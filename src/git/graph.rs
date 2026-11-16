@@ -236,62 +236,17 @@ pub fn compute_graph_lanes(commits: &mut [CommitNode]) {
     }
 }
 
-/// Carica il grafo della cronologia commit (inclusi Incoming/Outgoing rispetto all'upstream).
-pub fn fetch_commit_graph(
-    repo_path: &Path,
-    upstream: Option<&str>,
-    max_count: usize,
-) -> Result<(Vec<CommitNode>, Vec<GitCommandLog>), String> {
-    let mut logs = Vec::new();
-    let mut outgoing_shas = HashSet::new();
-    let mut incoming_shas = HashSet::new();
+/// `git log` format shared by the graph and the branch details: fields separated by `0x1f`.
+const LOG_FORMAT: &str = "--format=%H%x1f%h%x1f%P%x1f%an%x1f%ae%x1f%cr%x1f%ci%x1f%D%x1f%s";
 
-    if let Some(up) = upstream {
-        // Outgoing: ahead of upstream (up..HEAD)
-        if let Ok(out) = run_git(
-            repo_path,
-            &["rev-list", &format!("{}..HEAD", up)],
-            None,
-            false,
-        ) {
-            if out.is_success() {
-                for l in out.stdout.lines() {
-                    outgoing_shas.insert(l.trim().to_string());
-                }
-            }
-        }
-        // Incoming: behind upstream (HEAD..up)
-        if let Ok(inc) = run_git(
-            repo_path,
-            &["rev-list", &format!("HEAD..{}", up)],
-            None,
-            false,
-        ) {
-            if inc.is_success() {
-                for l in inc.stdout.lines() {
-                    incoming_shas.insert(l.trim().to_string());
-                }
-            }
-        }
-    }
-
-    let limit_arg = format!("-n{}", max_count);
-    let format_arg = "--format=%H%x1f%h%x1f%P%x1f%an%x1f%ae%x1f%cr%x1f%ci%x1f%D%x1f%s";
-    let log_out = run_git(
-        repo_path,
-        &["log", "--all", "--topo-order", &limit_arg, format_arg],
-        None,
-        false,
-    )?;
-    logs.push(log_out.log.clone());
-
-    if !log_out.is_success() {
-        // Repo vuoto senza commit
-        return Ok((Vec::new(), logs));
-    }
-
+/// Parses the output of `git log` made with [`LOG_FORMAT`] (lanes are not computed here).
+fn parse_commit_lines(
+    stdout: &str,
+    outgoing_shas: &HashSet<String>,
+    incoming_shas: &HashSet<String>,
+) -> Vec<CommitNode> {
     let mut nodes = Vec::new();
-    for line in log_out.stdout.lines() {
+    for line in stdout.lines() {
         let fields: Vec<&str> = line.split('\x1f').collect();
         if fields.len() < 9 {
             continue;
@@ -335,62 +290,87 @@ pub fn fetch_commit_graph(
             edges_to_next_row: Vec::new(),
         });
     }
+    nodes
+}
 
+/// Carica il grafo della cronologia commit (inclusi Incoming/Outgoing rispetto all'upstream).
+pub fn fetch_commit_graph(
+    repo_path: &Path,
+    upstream: Option<&str>,
+    max_count: usize,
+) -> Result<(Vec<CommitNode>, Vec<GitCommandLog>), String> {
+    let mut logs = Vec::new();
+    let mut outgoing_shas = HashSet::new();
+    let mut incoming_shas = HashSet::new();
+
+    if let Some(up) = upstream {
+        // Outgoing: ahead of upstream (up..HEAD)
+        if let Ok(out) = run_git(
+            repo_path,
+            &["rev-list", &format!("{}..HEAD", up)],
+            None,
+            false,
+        ) {
+            if out.is_success() {
+                for l in out.stdout.lines() {
+                    outgoing_shas.insert(l.trim().to_string());
+                }
+            }
+        }
+        // Incoming: behind upstream (HEAD..up)
+        if let Ok(inc) = run_git(
+            repo_path,
+            &["rev-list", &format!("HEAD..{}", up)],
+            None,
+            false,
+        ) {
+            if inc.is_success() {
+                for l in inc.stdout.lines() {
+                    incoming_shas.insert(l.trim().to_string());
+                }
+            }
+        }
+    }
+
+    let limit_arg = format!("-n{}", max_count);
+    let log_out = run_git(
+        repo_path,
+        &["log", "--all", "--topo-order", &limit_arg, LOG_FORMAT],
+        None,
+        false,
+    )?;
+    logs.push(log_out.log.clone());
+
+    if !log_out.is_success() {
+        // Repo vuoto senza commit
+        return Ok((Vec::new(), logs));
+    }
+
+    let mut nodes = parse_commit_lines(&log_out.stdout, &outgoing_shas, &incoming_shas);
     compute_graph_lanes(&mut nodes);
 
     Ok((nodes, logs))
 }
 
-/// Compact commit data shown in the Graph Details panel.
-#[derive(Debug, Clone)]
-pub struct BranchCommit {
-    pub sha: String,
-    pub short_sha: String,
-    pub author: String,
-    pub iso_date: String,
-    pub subject: String,
-}
-
-/// Loads the latest `max_count` commits reachable from `branch` (any ref name accepted by `git log`).
+/// Loads the latest `max_count` commits reachable from `branch` with their graph lanes computed.
 pub fn fetch_branch_commits(
     repo_path: &Path,
     branch: &str,
     max_count: usize,
-) -> Result<(Vec<BranchCommit>, GitCommandLog), String> {
+) -> Result<(Vec<CommitNode>, GitCommandLog), String> {
     let limit_arg = format!("-n{}", max_count);
     let out = run_git(
         repo_path,
-        &[
-            "log",
-            &limit_arg,
-            "--format=%H%x1f%h%x1f%an%x1f%ci%x1f%s",
-            branch,
-            "--",
-        ],
+        &["log", "--topo-order", &limit_arg, LOG_FORMAT, branch, "--"],
         None,
         false,
     )?;
     if !out.is_success() {
         return Err(format!("git log {} failed: {}", branch, out.stderr.trim()));
     }
-    let commits = out
-        .stdout
-        .lines()
-        .filter_map(|line| {
-            let f: Vec<&str> = line.split('\x1f').collect();
-            if f.len() < 5 {
-                return None;
-            }
-            Some(BranchCommit {
-                sha: f[0].trim().to_string(),
-                short_sha: f[1].trim().to_string(),
-                author: f[2].trim().to_string(),
-                iso_date: f[3].trim().to_string(),
-                subject: f[4].to_string(),
-            })
-        })
-        .collect();
-    Ok((commits, out.log))
+    let mut nodes = parse_commit_lines(&out.stdout, &HashSet::new(), &HashSet::new());
+    compute_graph_lanes(&mut nodes);
+    Ok((nodes, out.log))
 }
 
 /// Carica i dettagli completi e la lista dei file modificati in uno specifico commit.

@@ -1,7 +1,8 @@
 use crate::i18n::tr;
 use crate::state::AppState;
 use crate::theme::VsCodeTheme;
-use egui::{Align2, CornerRadius, FontFamily, FontId, Rect, RichText, Sense, Stroke, Vec2, pos2};
+use crate::ui::graph_view::{draw_graph_cell, graph_column_width, max_lane_of};
+use egui::{Align2, CornerRadius, FontFamily, FontId, Rect, RichText, Sense, Vec2, pos2};
 
 /// Height of a commit row in the details table.
 const ROW_HEIGHT: f32 = 22.0;
@@ -17,25 +18,11 @@ fn format_date(iso_date: &str) -> &str {
     iso_date.get(..16).unwrap_or(iso_date)
 }
 
-/// Renders the Graph Details panel on the right side of the window (when opened from the graph header).
-pub fn render_details_panel(ctx: &egui::Context, state: &mut AppState) {
-    if !state.details_open {
-        return;
-    }
-    egui::SidePanel::right("graph_details_panel")
-        .default_width(560.0)
-        .width_range(360.0..=f32::INFINITY)
-        .resizable(true)
-        .frame(
-            egui::Frame::NONE
-                .fill(VsCodeTheme::SIDEBAR_BG)
-                .stroke(Stroke::new(1.0_f32, VsCodeTheme::BORDER)),
-        )
-        .show(ctx, |ui| {
-            render_toolbar(ui, state);
-            ui.separator();
-            render_table(ui, state);
-        });
+/// Renders the Graph Details tab content: toolbar plus the commits table.
+pub fn render_details_tab(ui: &mut egui::Ui, state: &mut AppState) {
+    render_toolbar(ui, state);
+    ui.separator();
+    render_table(ui, state);
 }
 
 /// Top bar: branch selector and the "show remote branches" flag.
@@ -111,10 +98,12 @@ fn render_table(ui: &mut egui::Ui, state: &mut AppState) {
 
     // Header row
     let (hdr, _) = ui.allocate_exact_size(Vec2::new(ui.available_width(), ROW_HEIGHT), Sense::hover());
-    let cols = column_rects(hdr);
+    let graph_w = graph_column_width(max_lane_of(&state.details_commits));
+    let cols = column_rects(hdr, graph_w);
     let hdr_font = FontId::new(11.5, FontFamily::Proportional);
     let hdr_painter = ui.painter();
     for (rect, label) in [
+        (cols.graph, "Graph"),
         (cols.subject, tr(lang, "Description", "Descrizione")),
         (cols.date, tr(lang, "Date", "Data")),
         (cols.author, tr(lang, "Author", "Autore")),
@@ -150,7 +139,11 @@ fn render_table(ui: &mut egui::Ui, state: &mut AppState) {
         .id_salt("graph_details_scroll")
         .auto_shrink([false, false])
         .show_rows(ui, ROW_HEIGHT, total, |ui, range| {
-            for commit in &state.details_commits[range] {
+            let start = range.start;
+            for (offset, commit) in state.details_commits[range].iter().enumerate() {
+                let prev = (start + offset)
+                    .checked_sub(1)
+                    .map(|i| &state.details_commits[i]);
                 let (rect, resp) = ui.allocate_exact_size(
                     Vec2::new(ui.available_width(), ROW_HEIGHT),
                     Sense::click(),
@@ -167,8 +160,9 @@ fn render_table(ui: &mut egui::Ui, state: &mut AppState) {
                         .rect_filled(rect, CornerRadius::ZERO, VsCodeTheme::LIST_HOVER_BG);
                 }
 
-                let cols = column_rects(rect);
+                let cols = column_rects(rect, graph_w);
                 let painter = ui.painter();
+                draw_graph_cell(&painter.with_clip_rect(cols.graph), rect, prev, commit);
                 let cells = [
                     (cols.subject, commit.subject.as_str(), &font, VsCodeTheme::TEXT_PRIMARY),
                     (cols.date, format_date(&commit.iso_date), &font, VsCodeTheme::TEXT_MUTED),
@@ -197,21 +191,24 @@ fn render_table(ui: &mut egui::Ui, state: &mut AppState) {
 
 /// Column rectangles of a table row: description takes the remaining width, the others are fixed.
 struct Columns {
+    graph: Rect,
     subject: Rect,
     date: Rect,
     author: Rect,
     commit: Rect,
 }
 
-fn column_rects(row: Rect) -> Columns {
+fn column_rects(row: Rect, graph_w: f32) -> Columns {
     let right = row.right() - PAD;
     let commit_l = right - COMMIT_COL_W;
     let author_l = commit_l - AUTHOR_COL_W;
     let date_l = author_l - DATE_COL_W;
     let (top, bot) = (row.top(), row.bottom());
     let cell = |l: f32, r: f32| Rect::from_min_max(pos2(l, top), pos2(r - 6.0, bot));
+    let graph = Rect::from_min_max(row.left_top(), pos2(row.left() + graph_w, bot));
     Columns {
-        subject: cell(row.left() + PAD, date_l.max(row.left() + PAD + 40.0)),
+        graph,
+        subject: cell(graph.right(), date_l.max(graph.right() + 40.0)),
         date: cell(date_l, author_l),
         author: cell(author_l, commit_l),
         commit: Rect::from_min_max(pos2(commit_l, top), pos2(right, bot)),

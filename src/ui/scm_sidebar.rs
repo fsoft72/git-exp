@@ -1070,7 +1070,7 @@ fn render_collapsible_graph_section(ui: &mut egui::Ui, state: &mut AppState) {
             state.trigger_refresh();
             btn_clicked = true;
         }
-        if details_button(ui, lang, state.details_open) {
+        if details_button(ui, lang, state.details_open()) {
             state.toggle_graph_details();
             btn_clicked = true;
         }
@@ -1150,7 +1150,7 @@ fn render_full_graph_sidebar(ui: &mut egui::Ui, state: &mut AppState) {
             ) {
                 state.trigger_refresh();
             }
-            if details_button(ui, lang, state.details_open) {
+            if details_button(ui, lang, state.details_open()) {
                 state.toggle_graph_details();
             }
         });
