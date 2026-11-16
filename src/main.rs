@@ -66,6 +66,8 @@ impl eframe::App for VsCodeGitApp {
         ui::scm_sidebar::render_sidebar(ctx, &mut self.state);
         // 4. Git Output Drawer in basso (sopra la status bar)
         ui::output_panel::render_output_panel(ctx, &mut self.state);
+        // 4b. Graph Details panel on the right
+        ui::details_panel::render_details_panel(ctx, &mut self.state);
         // 5. Area Centrale Diff Viewer / Editor / Commit Inspector
         ui::diff_viewer::render_center_panel(ctx, &mut self.state);
         // 6. Modale Quick Pick / Command Palette sopra tutto

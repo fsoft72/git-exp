@@ -1070,6 +1070,10 @@ fn render_collapsible_graph_section(ui: &mut egui::Ui, state: &mut AppState) {
             state.trigger_refresh();
             btn_clicked = true;
         }
+        if details_button(ui, lang, state.details_open) {
+            state.toggle_graph_details();
+            btn_clicked = true;
+        }
     });
 
     if resp.clicked() && !btn_clicked {
@@ -1084,6 +1088,42 @@ fn render_collapsible_graph_section(ui: &mut egui::Ui, state: &mut AppState) {
         let height = ui.available_height().max(EMBEDDED_GRAPH_MIN_HEIGHT);
         render_graph_scroll(ui, state, "scm_embedded_graph_scroll", Some(height));
     }
+}
+
+/// Small "Details" toggle button for the graph header; returns `true` when clicked.
+fn details_button(ui: &mut egui::Ui, lang: Language, active: bool) -> bool {
+    let label = tr(lang, "Details", "Dettagli");
+    let text_color = if active {
+        VsCodeTheme::TEXT_BRIGHT
+    } else {
+        VsCodeTheme::TEXT_PRIMARY
+    };
+    let galley = ui.painter().layout_no_wrap(
+        label.to_string(),
+        FontId::new(11.0, FontFamily::Proportional),
+        text_color,
+    );
+    let size = Vec2::new(galley.size().x + 14.0, 18.0);
+    let (rect, resp) = ui.allocate_exact_size(size, Sense::click());
+    let fill = if active {
+        VsCodeTheme::ACCENT_BLUE
+    } else if resp.hovered() {
+        VsCodeTheme::WIDGET_BG
+    } else {
+        VsCodeTheme::BADGE_BG
+    };
+    ui.painter().rect_filled(rect, CornerRadius::same(3), fill);
+    ui.painter().galley(
+        rect.center() - galley.size() * 0.5,
+        galley,
+        text_color,
+    );
+    resp.on_hover_text(tr(
+        lang,
+        "Show graph details on the right",
+        "Mostra i dettagli del grafo a destra",
+    ))
+    .clicked()
 }
 
 fn render_full_graph_sidebar(ui: &mut egui::Ui, state: &mut AppState) {
@@ -1109,6 +1149,9 @@ fn render_full_graph_sidebar(ui: &mut egui::Ui, state: &mut AppState) {
                 tr(lang, "Refresh Graph", "Aggiorna Grafo"),
             ) {
                 state.trigger_refresh();
+            }
+            if details_button(ui, lang, state.details_open) {
+                state.toggle_graph_details();
             }
         });
     });

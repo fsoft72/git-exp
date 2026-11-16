@@ -1,4 +1,5 @@
 pub mod activity_bar;
+pub mod details_panel;
 pub mod diff_viewer;
 pub mod graph_view;
 pub mod output_panel;

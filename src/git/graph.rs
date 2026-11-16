@@ -341,6 +341,58 @@ pub fn fetch_commit_graph(
     Ok((nodes, logs))
 }
 
+/// Compact commit data shown in the Graph Details panel.
+#[derive(Debug, Clone)]
+pub struct BranchCommit {
+    pub sha: String,
+    pub short_sha: String,
+    pub author: String,
+    pub iso_date: String,
+    pub subject: String,
+}
+
+/// Loads the latest `max_count` commits reachable from `branch` (any ref name accepted by `git log`).
+pub fn fetch_branch_commits(
+    repo_path: &Path,
+    branch: &str,
+    max_count: usize,
+) -> Result<(Vec<BranchCommit>, GitCommandLog), String> {
+    let limit_arg = format!("-n{}", max_count);
+    let out = run_git(
+        repo_path,
+        &[
+            "log",
+            &limit_arg,
+            "--format=%H%x1f%h%x1f%an%x1f%ci%x1f%s",
+            branch,
+            "--",
+        ],
+        None,
+        false,
+    )?;
+    if !out.is_success() {
+        return Err(format!("git log {} failed: {}", branch, out.stderr.trim()));
+    }
+    let commits = out
+        .stdout
+        .lines()
+        .filter_map(|line| {
+            let f: Vec<&str> = line.split('\x1f').collect();
+            if f.len() < 5 {
+                return None;
+            }
+            Some(BranchCommit {
+                sha: f[0].trim().to_string(),
+                short_sha: f[1].trim().to_string(),
+                author: f[2].trim().to_string(),
+                iso_date: f[3].trim().to_string(),
+                subject: f[4].to_string(),
+            })
+        })
+        .collect();
+    Ok((commits, out.log))
+}
+
 /// Carica i dettagli completi e la lista dei file modificati in uno specifico commit.
 pub fn fetch_commit_details(
     repo_path: &Path,

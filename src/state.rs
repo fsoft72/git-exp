@@ -1,6 +1,9 @@
 use crate::git::cli::GitCommandLog;
 use crate::git::diff::{DiffTarget, FileDiff, fetch_file_diff, target_from_change};
-use crate::git::graph::{CommitDetails, CommitNode, fetch_commit_details, fetch_commit_graph};
+use crate::git::graph::{
+    BranchCommit, CommitDetails, CommitNode, fetch_branch_commits, fetch_commit_details,
+    fetch_commit_graph,
+};
 use crate::git::ops::{self, CommitVariant};
 use crate::git::status::{FileChange, FileStatusKind, RepoStatus, fetch_repo_status};
 use crate::i18n::{Language, tr};
@@ -113,6 +116,9 @@ pub enum ActiveSidebarPanel {
 /// Number of commits loaded for the graph at first and added each time the user reaches the end.
 const GRAPH_PAGE_SIZE: usize = 200;
 
+/// Maximum number of commits listed in the Graph Details panel.
+const DETAILS_MAX_COMMITS: usize = 500;
+
 pub enum WorkerEvent {
     /// The filesystem watcher finished its (slow) setup in the background.
     WatcherReady {
@@ -196,6 +202,13 @@ pub struct AppState {
     pub selected_change_path: Option<(String, crate::git::status::ChangeGroup)>,
     pub selected_commit_sha: Option<String>,
 
+    // Graph Details panel (right side of the window)
+    pub details_open: bool,
+    /// Branch shown in the details panel; `None` follows the current branch
+    pub details_branch: Option<String>,
+    pub details_show_remote: bool,
+    pub details_commits: Vec<BranchCommit>,
+
     // Center tabs & Diff state
     pub open_tabs: Vec<CenterTab>,
     pub active_tab_idx: usize,
@@ -258,6 +271,10 @@ impl AppState {
             tree_collapsed_folders: BTreeSet::new(),
             selected_change_path: None,
             selected_commit_sha: None,
+            details_open: false,
+            details_branch: None,
+            details_show_remote: false,
+            details_commits: Vec::new(),
             open_tabs: Vec::new(),
             active_tab_idx: 0,
             selected_hunk_lines: BTreeMap::new(),
@@ -322,6 +339,8 @@ impl AppState {
         self.status = RepoStatus::default();
         self.graph_commits.clear();
         self.graph_limit = GRAPH_PAGE_SIZE;
+        self.details_branch = None;
+        self.details_commits.clear();
         self.watcher = None;
         self.watcher_requested_for = None;
         // Give immediate feedback: opening a large repository can take a while
@@ -443,6 +462,7 @@ impl AppState {
                     }
                     self.status = status;
                     self.graph_commits = graph;
+                    self.reload_graph_details();
                     self.git_logs.extend(logs);
                     if self.git_logs.len() > 500 {
                         let drain_cnt = self.git_logs.len() - 500;
@@ -491,6 +511,44 @@ impl AppState {
         if need_refresh {
             self.trigger_refresh();
         }
+    }
+
+    /// Branch whose commits the details panel shows: the user choice or the current branch.
+    pub fn details_effective_branch(&self) -> String {
+        self.details_branch
+            .clone()
+            .unwrap_or_else(|| self.status.head_name.clone())
+    }
+
+    /// Reloads the commits listed in the details panel. No-op while the panel is closed.
+    pub fn reload_graph_details(&mut self) {
+        if !self.details_open {
+            return;
+        }
+        let Some(repo) = self.repo_path.clone() else {
+            return;
+        };
+        let branch = self.details_effective_branch();
+        if branch.is_empty() {
+            self.details_commits.clear();
+            return;
+        }
+        match fetch_branch_commits(&repo, &branch, DETAILS_MAX_COMMITS) {
+            Ok((commits, log)) => {
+                self.git_logs.push(log);
+                self.details_commits = commits;
+            }
+            Err(e) => {
+                self.details_commits.clear();
+                self.last_error = Some(e);
+            }
+        }
+    }
+
+    /// Opens or closes the details panel, loading its commits when it opens.
+    pub fn toggle_graph_details(&mut self) {
+        self.details_open = !self.details_open;
+        self.reload_graph_details();
     }
 
     /// Loads one more page of history when the graph shows everything git returned so far.

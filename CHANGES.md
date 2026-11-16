@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Added a "Details" button in the Source Control Graph header (sidebar section and full graph view): it opens a resizable panel on the right of the window listing the commits of a branch with description, date, author and commit id; a dropdown on top selects the branch (default: current branch) and a "Show Remote Branches" flag adds the remote branches to it. Clicking a row opens the commit inspector
 - Removed the 620 px maximum width of the left sidebar (minimum stays 220 px), so the git graph can be as wide as needed
 - Git graph rows show the commit date (`YYYY-MM-DD HH:MM:SS`) after the author name; author and date are right aligned in their own column so they no longer overlap the subject. On a narrow sidebar (text area under 400 px) the author is hidden and only the date is shown
 - The SCM sidebar graph section sits below the changes scroll area (single scrollbar per area, no nested scrolling) and cannot widen the sidebar
