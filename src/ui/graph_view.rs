@@ -53,7 +53,11 @@ pub fn draw_ref_badges(ui: &mut egui::Ui, refs: &[RefBadge]) {
                 ui.horizontal(|ui| {
                     ui.spacing_mut().item_spacing.x = 2.0;
                     draw_inline_codicon(ui, icon, 11.0, fg);
-                    ui.label(RichText::new(&badge.name).size(10.5).strong().color(fg));
+                    // Not selectable, so clicks fall through to the row
+                    ui.add(
+                        egui::Label::new(RichText::new(&badge.name).size(10.5).strong().color(fg))
+                            .selectable(false),
+                    );
                 });
             });
     }
@@ -312,6 +316,7 @@ pub fn render_graph_list(ui: &mut egui::Ui, state: &mut AppState, range: std::op
         };
         row_ui.add(
             egui::Label::new(RichText::new(&commit.subject).size(12.5).color(subj_color))
+                .selectable(false)
                 .truncate(),
         );
 
