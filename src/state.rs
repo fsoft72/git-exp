@@ -86,6 +86,11 @@ pub enum QuickPickKind {
     DeleteTag,
     ConfirmDiscardAll,
     ConfirmDiscardFile { path: String, kind: FileStatusKind },
+    /// Discard every change inside a folder (all files with their status kind).
+    ConfirmDiscardFolder {
+        name: String,
+        items: Vec<(String, FileStatusKind)>,
+    },
 }
 
 #[derive(Debug, Clone)]
@@ -896,6 +901,27 @@ impl AppState {
                         Language::It => format!("Ripristinato {}", path),
                     };
                     (msg, vec![l])
+                })
+                .map_err(|(e, l)| (e, vec![l]))
+        });
+    }
+
+    /// Discards the changes of many files at once (used by the folder "Discard" button).
+    pub fn discard_paths_confirmed(&mut self, items: Vec<(String, FileStatusKind)>) {
+        let lang = self.settings.language;
+        let lbl = tr(
+            lang,
+            "Discarding folder changes...",
+            "Annullamento modifiche cartella...",
+        );
+        self.spawn_git_task(lbl, move |repo| {
+            ops::discard_paths(repo, &items)
+                .map(|logs| {
+                    let msg = match lang {
+                        Language::En => format!("Restored {} files", items.len()),
+                        Language::It => format!("Ripristinati {} file", items.len()),
+                    };
+                    (msg, logs)
                 })
                 .map_err(|(e, l)| (e, vec![l]))
         });

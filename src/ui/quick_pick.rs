@@ -184,6 +184,10 @@ fn render_quick_pick_body(ui: &mut egui::Ui, state: &mut AppState, qp: &QuickPic
             "Annullare TUTTE le modifiche nel working tree e non tracciate? (Irreversibile)",
         )
         .to_string(),
+        QuickPickKind::ConfirmDiscardFolder { name, items } => match lang {
+            Language::En => format!("Discard changes in {} files of '{}'?", items.len(), name),
+            Language::It => format!("Annullare le modifiche di {} file in '{}'?", items.len(), name),
+        },
         QuickPickKind::ConfirmDiscardFile { path, .. } => match lang {
             Language::En => format!("Discard changes in '{}'?", path),
             Language::It => format!("Annullare le modifiche in '{}'?", path),
@@ -1064,6 +1068,25 @@ fn build_quick_pick_items(
                 .into(),
                 detail: tr(lang, "Destructive", "Distruttivo").into(),
                 action: Box::new(|st| st.discard_all_confirmed()),
+            });
+            raw.push(QuickPickItem {
+                icon: Some(Codicon::Close),
+                label: tr(lang, "Cancel", "Annulla").into(),
+                detail: "Esc".into(),
+                action: Box::new(|_| {}),
+            });
+        }
+        QuickPickKind::ConfirmDiscardFolder { name, items } => {
+            let list = items.clone();
+            let label = match lang {
+                Language::En => format!("Yes, Discard Changes in '{}' ({} files)", name, list.len()),
+                Language::It => format!("Sì, Annulla le Modifiche in '{}' ({} file)", name, list.len()),
+            };
+            raw.push(QuickPickItem {
+                icon: Some(Codicon::Discard),
+                label,
+                detail: tr(lang, "Destructive", "Distruttivo").into(),
+                action: Box::new(move |st| st.discard_paths_confirmed(list)),
             });
             raw.push(QuickPickItem {
                 icon: Some(Codicon::Close),

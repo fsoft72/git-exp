@@ -86,6 +86,31 @@ pub fn discard_file(
     }
 }
 
+/// Discards the changes of many files: untracked ones are removed from disk,
+/// tracked ones are restored with a single `git checkout -- <paths>` call.
+pub fn discard_paths(
+    repo: &Path,
+    items: &[(String, FileStatusKind)],
+) -> Result<Vec<GitCommandLog>, (String, GitCommandLog)> {
+    let mut logs = Vec::new();
+    let mut tracked: Vec<&str> = Vec::new();
+    for (path, kind) in items {
+        if *kind == FileStatusKind::Untracked {
+            logs.push(discard_file(repo, path, *kind)?);
+        } else {
+            tracked.push(path.as_str());
+        }
+    }
+    if tracked.is_empty() {
+        return Ok(logs);
+    }
+    let mut args = vec!["checkout", "--"];
+    args.extend(tracked);
+    let out = run_git(repo, &args, None, true).map_err(|e| (e.clone(), dummy_log(&e)))?;
+    logs.push(ensure_ok(out)?);
+    Ok(logs)
+}
+
 pub fn discard_all(repo: &Path) -> Result<Vec<GitCommandLog>, (String, GitCommandLog)> {
     let mut logs = Vec::new();
     let out1 = run_git(repo, &["checkout", "--", "."], None, true)

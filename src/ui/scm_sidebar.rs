@@ -835,6 +835,16 @@ impl FolderTreeNode {
             sub.collect_all_paths(out);
         }
     }
+
+    /// Collects every file of this folder (recursively) with its status kind.
+    fn collect_all_items(&self, out: &mut Vec<(String, FileStatusKind)>) {
+        for f in &self.files {
+            out.push((f.path.clone(), f.kind));
+        }
+        for sub in self.subfolders.values() {
+            sub.collect_all_items(out);
+        }
+    }
 }
 
 fn render_file_tree_group(
@@ -934,6 +944,21 @@ fn render_tree_node_recursive(
                             tr(lang, "Stage Folder", "Aggiungi Cartella allo Stage"),
                         ) {
                             state.stage_paths_batch(folder_paths);
+                            folder_action = true;
+                        }
+                        if codicon_button(
+                            ui,
+                            Codicon::Discard,
+                            tr(lang, "Discard Folder Changes", "Annulla Modifiche Cartella"),
+                        ) {
+                            let mut items = Vec::new();
+                            subnode.collect_all_items(&mut items);
+                            state.quick_pick = Some(QuickPickState::new(
+                                QuickPickKind::ConfirmDiscardFolder {
+                                    name: folder_name.clone(),
+                                    items,
+                                },
+                            ));
                             folder_action = true;
                         }
                     }
