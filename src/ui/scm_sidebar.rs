@@ -645,12 +645,15 @@ fn render_file_change_row(
     if icon_txt.is_empty() {
         draw_inline_codicon(&mut row_ui, Codicon::FileCode, 14.0, icon_col);
     } else {
-        row_ui.label(
-            RichText::new(icon_txt)
-                .monospace()
-                .size(10.0)
-                .strong()
-                .color(icon_col),
+        row_ui.add(
+            egui::Label::new(
+                RichText::new(icon_txt)
+                    .monospace()
+                    .size(10.0)
+                    .strong()
+                    .color(icon_col),
+            )
+            .selectable(false),
         );
     }
 
@@ -665,16 +668,19 @@ fn render_file_change_row(
     if change.kind == FileStatusKind::Deleted {
         name_rt = name_rt.strikethrough();
     }
-    row_ui.label(name_rt);
+    row_ui.add(egui::Label::new(name_rt).selectable(false));
 
     // Percorso cartella relativo attenuato (in List View)
     if show_parent_dir {
         let dir = change.parent_dir();
         if !dir.is_empty() {
-            row_ui.label(
-                RichText::new(dir)
-                    .size(11.0)
-                    .color(VsCodeTheme::TEXT_MUTED),
+            row_ui.add(
+                egui::Label::new(
+                    RichText::new(dir)
+                        .size(11.0)
+                        .color(VsCodeTheme::TEXT_MUTED),
+                )
+                .selectable(false),
             );
         }
     }
@@ -685,11 +691,14 @@ fn render_file_change_row(
         ui.add_space(8.0);
 
         // Lettera stato Git (`M`, `U`, `A`, `D`, `R`, `!`)
-        ui.label(
-            RichText::new(change.kind.badge_letter())
-                .size(11.5)
-                .strong()
-                .color(change.kind.color()),
+        ui.add(
+            egui::Label::new(
+                RichText::new(change.kind.badge_letter())
+                    .size(11.5)
+                    .strong()
+                    .color(change.kind.color()),
+            )
+            .selectable(false),
         )
         .on_hover_text(
             change
@@ -913,10 +922,13 @@ fn render_tree_node_recursive(
             15.0,
             Color32::from_rgb(0xDC, 0xB6, 0x7A),
         );
-        row_ui.label(
-            RichText::new(folder_name)
-                .size(12.5)
-                .color(VsCodeTheme::TEXT_PRIMARY),
+        row_ui.add(
+            egui::Label::new(
+                RichText::new(folder_name)
+                    .size(12.5)
+                    .color(VsCodeTheme::TEXT_PRIMARY),
+            )
+            .selectable(false),
         );
 
         let mut folder_action = false;

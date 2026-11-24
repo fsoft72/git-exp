@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Tree / list view: clicking the file icon, name, folder path or status letter of a row now always opens the diff (those labels were selectable and sometimes swallowed the click)
 - Tree view: folder rows in the Changes group now have a "Discard Folder Changes" button (next to "Stage Folder") that reverts every file inside the folder, recursively, after a confirmation; tracked files are restored with one `git checkout --` call, untracked ones are removed
 - Git graph rows: the whole row (subject and ref pill labels included) now reacts to clicks and the text can no longer be selected; before, clicking on the label was swallowed by the selectable label
 - The Graph Details tab shows the branch / tag pills before the commit description (same look as the graph in the sidebar; the pill drawing code is now shared)
