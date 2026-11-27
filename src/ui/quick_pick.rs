@@ -452,21 +452,25 @@ fn render_quick_pick_body(ui: &mut egui::Ui, state: &mut AppState, qp: &QuickPic
                         },
                     );
                 }
-                row_ui.label(
-                    RichText::new(&item.label).size(12.5).color(if is_sel {
+                row_ui.add(
+                    egui::Label::new(RichText::new(&item.label).size(12.5).color(if is_sel {
                         VsCodeTheme::TEXT_BRIGHT
                     } else {
                         VsCodeTheme::TEXT_PRIMARY
-                    }),
+                    }))
+                    .selectable(false),
                 );
 
                 if !item.detail.is_empty() {
                     row_ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                         ui.add_space(8.0);
-                        ui.label(
-                            RichText::new(&item.detail)
-                                .size(11.0)
-                                .color(VsCodeTheme::TEXT_MUTED),
+                        ui.add(
+                            egui::Label::new(
+                                RichText::new(&item.detail)
+                                    .size(11.0)
+                                    .color(VsCodeTheme::TEXT_MUTED),
+                            )
+                            .selectable(false),
                         );
                     });
                 }
