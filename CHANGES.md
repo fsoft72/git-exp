@@ -3,6 +3,7 @@
 ## Unreleased
 
 - Quick pick (branch checkout, command palette): the list now grows with the window height (it was fixed at 320 px), minimum stays 320 px
+- Checkout: choosing a remote branch (e.g. `origin/master`) when a local branch with the same name exists now switches to the local branch instead of failing with "a branch named ... already exists"
 - Quick pick (branch checkout, command palette): the whole row is now clickable; label and detail texts are no longer selectable, so they do not swallow the click
 
 - Tree / list view: clicking the file icon, name, folder path or status letter of a row now always opens the diff (those labels were selectable and sometimes swallowed the click)

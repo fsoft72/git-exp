@@ -233,7 +233,19 @@ pub fn checkout_branch(
     is_remote: bool,
 ) -> Result<GitCommandLog, (String, GitCommandLog)> {
     if is_remote {
-        // Se è `origin/feature`, usa `git checkout --track origin/feature`
+        // `origin/feature` -> local name `feature`; if it already exists, switch to it
+        if let Some((_, local)) = target.split_once('/') {
+            let local_ref = format!("refs/heads/{}", local);
+            let exists = run_git(repo, &["rev-parse", "--verify", "--quiet", &local_ref], None, true)
+                .map(|o| o.is_success())
+                .unwrap_or(false);
+            if exists {
+                let out = run_git(repo, &["checkout", local], None, true)
+                    .map_err(|e| (e.clone(), dummy_log(&e)))?;
+                return ensure_ok(out);
+            }
+        }
+        // Otherwise create a tracking branch: `git checkout --track origin/feature`
         let out = run_git(repo, &["checkout", "--track", target], None, true)
             .map_err(|e| (e.clone(), dummy_log(&e)))?;
         ensure_ok(out)
