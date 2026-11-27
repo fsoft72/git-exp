@@ -403,9 +403,11 @@ fn render_quick_pick_body(ui: &mut egui::Ui, state: &mut AppState, qp: &QuickPic
         None
     };
 
+    // List grows with the window: leave room for top offset, input box and margins
+    let list_max_h = (ui.ctx().screen_rect().height() - 36.0 - 120.0).max(320.0);
     egui::ScrollArea::vertical()
         .id_salt("quick_pick_list_scroll")
-        .max_height(320.0)
+        .max_height(list_max_h)
         .show(ui, |ui| {
             for (idx, item) in items.iter().enumerate() {
                 let is_sel = idx == selected_idx;

@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Quick pick (branch checkout, command palette): the list now grows with the window height (it was fixed at 320 px), minimum stays 320 px
+
 - Tree / list view: clicking the file icon, name, folder path or status letter of a row now always opens the diff (those labels were selectable and sometimes swallowed the click)
 - Tree view: folder rows in the Changes group now have a "Discard Folder Changes" button (next to "Stage Folder") that reverts every file inside the folder, recursively, after a confirmation; tracked files are restored with one `git checkout --` call, untracked ones are removed
 - Git graph rows: the whole row (subject and ref pill labels included) now reacts to clicks and the text can no longer be selected; before, clicking on the label was swallowed by the selectable label
